@@ -1,0 +1,180 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { Database } from '../types/database';
+
+interface AttendanceSummaryProps {
+    seccionId: string;
+    onClose: () => void;
+}
+
+export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId, onClose }) => {
+    const [loading, setLoading] = useState(true);
+    const [seccionName, setSeccionName] = useState('');
+    const [estudiantes, setEstudiantes] = useState<any[]>([]);
+    const [stats, setStats] = useState<Record<string, any>>({});
+
+    useEffect(() => {
+        fetchData();
+    }, [seccionId]);
+
+    async function fetchData() {
+        setLoading(true);
+        try {
+            // 1. Get Section info
+            const { data } = await supabase.from('secciones').select('*').eq('id', seccionId).single();
+            const secData = data as Database['public']['Tables']['secciones']['Row'] | null;
+            setSeccionName(secData?.nombre || '');
+
+            // 2. Get Students
+            const { data: estData } = await supabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
+            const students = estData || [];
+            setEstudiantes(students);
+
+            // 3. Get Attendance Records
+            const { data: attendanceData } = await supabase
+                .from('control_asistencia')
+                .select('estudiante_id, fecha, estado_id, estados_asistencia(peso_ausencia, es_justificada)')
+                .eq('seccion_id', seccionId);
+
+            // 4. Get Daily Configs
+            const { data: configData } = await supabase.from('configuracion_diaria').select('fecha, lecciones_totales').eq('seccion_id', seccionId);
+            const configMap: Record<string, number> = {};
+            configData?.forEach((c: any) => { configMap[c.fecha] = c.lecciones_totales; });
+
+            // 5. Calculate stats per student
+            const newStats: any = {};
+
+            // First calculate total programmed lessons for the section
+            const uniqueDates = Array.from(new Set((attendanceData || []).map((a: any) => a.fecha)));
+            let totalProgrammedLessons = 0;
+            uniqueDates.forEach(d => {
+                totalProgrammedLessons += configMap[d] || 4;
+            });
+
+            students.forEach((est: any) => {
+                const studentAttendance = (attendanceData || []).filter((a: any) => a.estudiante_id === est.cedula);
+                let totalWeight = 0;
+
+                studentAttendance.forEach((att: any) => {
+                    // Only count unjustified absences/tardies
+                    if (!att.estados_asistencia?.es_justificada) {
+                        const lessonsToday = configMap[att.fecha] || 4;
+                        let weight = att.estados_asistencia?.peso_ausencia || 0;
+
+                        // Scale weight if lessons < 4
+                        if (lessonsToday < 4 && weight > 0) {
+                            // If it was "Ausencia Total (4)", and today there are only 2, it should count as 2.
+                            weight = (weight / 4) * lessonsToday;
+                        }
+                        totalWeight += weight;
+                    }
+                });
+
+                // Apply logic: Math.floor of total weights
+                const flooredAbsences = Math.floor(totalWeight);
+
+                // Porcentaje de ausentismo: (Ausencias / Lecciones) * 100
+                const absenteeismPercentage = totalProgrammedLessons > 0
+                    ? (flooredAbsences / totalProgrammedLessons) * 100
+                    : 0;
+
+                // Escala MEP:
+                let grade = 0;
+                if (absenteeismPercentage < 10) grade = 5;
+                else if (absenteeismPercentage < 20) grade = 4;
+                else if (absenteeismPercentage < 30) grade = 3;
+                else if (absenteeismPercentage < 40) grade = 2;
+                else if (absenteeismPercentage < 50) grade = 1;
+                else grade = 0;
+
+                newStats[est.cedula] = {
+                    totalLessons: totalProgrammedLessons,
+                    totalWeight: totalWeight,
+                    absenteeismPercentage: absenteeismPercentage,
+                    grade: grade
+                };
+            });
+
+            setStats(newStats);
+        } catch (error) {
+            console.error('Error fetching attendance summary:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    const handlePrint = () => { window.print(); };
+
+    return (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', position: 'relative', background: '#1e1b4b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="no-print">
+                    <h2 style={{ margin: 0 }}>Cálculo de Asistencia (5%) - {seccionName}</h2>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button onClick={handlePrint} className="btn-primary" style={{ background: 'var(--primary)' }}>🖨️ Imprimir PDF</button>
+                        <button onClick={onClose} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>Cerrar</button>
+                    </div>
+                </div>
+
+                <div className="only-print" style={{ display: 'none', textAlign: 'center', marginBottom: '2rem' }}>
+                    <h1 style={{ color: 'black' }}>Reporte de Evaluación de Asistencia - MEP 2026</h1>
+                    <p style={{ color: 'black' }}>Sección: {seccionName} | Valor: 5%</p>
+                </div>
+
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando datos...</div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid var(--glass-border)' }}>
+                                    <th style={{ textAlign: 'left', padding: '1rem' }}>Estudiante</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Lecciones Impartidas</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Peso Ausentismo (Injust.)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Ausencias (Floor)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>% Ausentismo</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)', fontWeight: 800 }}>NOTA FINAL (5%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {estudiantes.map(est => {
+                                    const s = stats[est.cedula] || { totalLessons: 0, totalWeight: 0, grade: 5 };
+                                    return (
+                                        <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '0.75rem 1rem' }}>{est.apellidos}, {est.nombre}</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{s.totalLessons}</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{s.totalWeight.toFixed(1)}</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{Math.floor(s.totalWeight)}</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem' }}>{(s as any).absenteeismPercentage ? (s as any).absenteeismPercentage.toFixed(1) : 0}%</td>
+                                            <td style={{ textAlign: 'center', padding: '0.75rem', fontWeight: 800, color: 'var(--primary)', fontSize: '1.1rem' }}>{s.grade}%</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                        <div style={{ marginTop: '2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }} className="no-print">
+                            <p><strong>Nota:</strong> Las tardías injustificadas suman 0.5. Las ausencias justificadas (J) no se contabilizan. Se aplica MATH FLOOR al peso total antes del cálculo.</p>
+                        </div>
+                    </div>
+                )}
+
+                <style>{`
+                    @media print {
+                        @page { size: portrait; margin: 15mm; }
+                        body * { visibility: hidden; }
+                        .modal-overlay, .modal-overlay * { visibility: visible; }
+                        .modal-overlay { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; padding: 0 !important; }
+                        .glass-card { background: white !important; border: none !important; color: black !important; width: 100% !important; max-width: 100% !important; box-shadow: none !important; }
+                        .no-print { display: none !important; }
+                        .only-print { display: block !important; }
+                        table { width: 100% !important; border-collapse: collapse !important; margin-top: 20px !important; }
+                        th, td { border: 1px solid black !important; padding: 8px !important; color: black !important; text-align: center; }
+                        th { background: #eee !important; font-weight: bold !important; }
+                        td:first-child { text-align: left !important; }
+                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    }
+                `}</style>
+            </div>
+        </div>
+    );
+};
