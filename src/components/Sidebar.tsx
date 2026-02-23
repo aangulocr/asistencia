@@ -4,9 +4,11 @@ interface SidebarProps {
     className?: string;
     currentView: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'reports';
     onViewChange: (view: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'reports') => void;
+    periodo: number;
+    onPeriodoChange: (periodo: number) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ className, currentView, onViewChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ className, currentView, onViewChange, periodo, onPeriodoChange }) => {
     const evaluationItems = [
         { id: 'attendance', icon: '📅', label: 'Asistencia' },
         { id: 'cotidiano', icon: '📝', label: 'Trabajo Cotidiano' },
@@ -58,6 +60,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, currentView, onView
                 <div className="logo">
                     <span className="logo-icon" style={{ fontSize: '1.8rem' }}>🏫</span>
                     <span className="logo-text" style={{ fontSize: '1.2rem', fontWeight: 800, background: 'linear-gradient(135deg, #fff 0%, #a5b4fc 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>MEP 2026</span>
+                </div>
+            </div>
+
+            <div className="semester-selector" style={{ padding: '0 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', paddingLeft: '1rem' }}>
+                    Periodo Académico
+                </div>
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '10px', gap: '0.25rem' }}>
+                    {[1, 2].map(p => (
+                        <button
+                            key={p}
+                            onClick={() => onPeriodoChange(p)}
+                            style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                background: periodo === p ? 'var(--primary)' : 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Semestre {p}
+                        </button>
+                    ))}
                 </div>
             </div>
 

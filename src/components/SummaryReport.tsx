@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 interface Props {
     seccionId: string;
+    periodo: number;
     onClose: () => void;
 }
 
@@ -15,13 +16,13 @@ interface StudentReport {
     nota: string;
 }
 
-export function SummaryReport({ seccionId, onClose }: Props) {
+export function SummaryReport({ seccionId, periodo, onClose }: Props) {
     const [reports, setReports] = useState<StudentReport[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         generateReport();
-    }, [seccionId]);
+    }, [seccionId, periodo]);
 
     const getNotaAsignada = (porcentaje: number): string => {
         if (porcentaje < 10) return "5%";
@@ -46,14 +47,16 @@ export function SummaryReport({ seccionId, onClose }: Props) {
             const { data: attendanceData } = await supabase
                 .from('control_asistencia')
                 .select('estudiante_id, fecha, estado_id, estados_asistencia(nombre, peso_ausencia)')
-                .eq('seccion_id', seccionId);
+                .eq('seccion_id', seccionId)
+                .eq('periodo', periodo);
             const attendance = attendanceData as any[] || [];
 
             // 3. Lesson Config
             const { data: configData } = await supabase
                 .from('configuracion_diaria')
                 .select('fecha, lecciones_totales')
-                .eq('seccion_id', seccionId);
+                .eq('seccion_id', seccionId)
+                .eq('periodo', periodo);
             const config = configData as any[] || [];
 
             const configMap: Record<string, number> = {};
@@ -133,7 +136,7 @@ export function SummaryReport({ seccionId, onClose }: Props) {
                 animation: 'scaleIn 0.3s ease-out'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>
-                    <h3 style={{ margin: 0 }}>Resumen de Asistencia y Calificación</h3>
+                    <h3 style={{ margin: 0 }}>Resumen de Asistencia y Calificación - Semestre {periodo}</h3>
                     <button
                         onClick={onClose}
 

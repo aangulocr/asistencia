@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Database } from '../types/database';
 
 interface Props {
     seccionId: string;
+    periodo: number;
 }
 
-export function Dashboard({ seccionId }: Props) {
+export function Dashboard({ seccionId, periodo }: Props) {
     const [stats, setStats] = useState({
         leccionesProgramadas: 0,
         ausenciasPromedio: 0,
@@ -14,7 +16,7 @@ export function Dashboard({ seccionId }: Props) {
 
     useEffect(() => {
         calculateStats();
-    }, [seccionId]);
+    }, [seccionId, periodo]);
 
     async function calculateStats() {
         // 1. Get student count
@@ -29,28 +31,32 @@ export function Dashboard({ seccionId }: Props) {
         const { data: attendanceData } = await supabase
             .from('control_asistencia')
             .select('fecha, estado_id, estados_asistencia(peso_ausencia)')
-            .eq('seccion_id', seccionId);
+            .eq('seccion_id', seccionId)
+            .eq('periodo', periodo);
 
         // 3. Get daily configurations
         const { data: configData } = await supabase
             .from('configuracion_diaria')
             .select('fecha, lecciones_totales')
-            .eq('seccion_id', seccionId);
+            .eq('seccion_id', seccionId)
+            .eq('periodo', periodo);
 
         const configMap: Record<string, number> = {};
-        configData?.forEach(c => {
+        const typedConfig = configData as Database['public']['Tables']['configuracion_diaria']['Row'][] | null;
+        typedConfig?.forEach(c => {
             configMap[c.fecha] = c.lecciones_totales;
         });
 
         // Calculate unique dates with records to get "Total Programmed Lessons"
-        const uniqueDates = Array.from(new Set(attendanceData?.map(a => a.fecha) || []));
+        const typedAttendance = attendanceData as Database['public']['Tables']['control_asistencia']['Row'][] | null;
+        const uniqueDates = Array.from(new Set(typedAttendance?.map(a => a.fecha) || []));
         let leccionesProgramadas = 0;
         uniqueDates.forEach(date => {
             leccionesProgramadas += configMap[date] || 4;
         });
 
         let sumAbsenceWeights = 0;
-        attendanceData?.forEach((r: any) => {
+        typedAttendance?.forEach((r: any) => {
             const lessonsToday = configMap[r.fecha] || 4;
             let peso = r.estados_asistencia?.peso_ausencia || 0;
             if (peso > 0) {

@@ -24,6 +24,7 @@ function App() {
     const [selectedSeccion, setSelectedSeccion] = useState<string | null>(null);
     const [selectedNivel, setSelectedNivel] = useState<number>(10);
     const [selectedDate, setSelectedDate] = useState<string>('2026-02-02');
+    const [periodo, setPeriodo] = useState<number>(1);
     const [showReport, setShowReport] = useState(false);
     const [showAttendanceSummary, setShowAttendanceSummary] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -75,11 +76,16 @@ function App() {
     return (
         <ToastProvider>
             <div className="app-layout">
-                <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+                <Sidebar
+                    currentView={currentView}
+                    onViewChange={setCurrentView}
+                    periodo={periodo}
+                    onPeriodoChange={setPeriodo}
+                />
                 <main className="container" style={{ paddingBottom: '5rem' }}>
                     {currentView === 'attendance' ? (
                         <>
-                            {selectedSeccion && <Dashboard key={`${selectedSeccion}-${refreshKey}`} seccionId={selectedSeccion} />}
+                            {selectedSeccion && <Dashboard key={`${selectedSeccion}-${periodo}-${refreshKey}`} seccionId={selectedSeccion} periodo={periodo} />}
 
                             <div className="grid" style={{ gridTemplateColumns: 'minmax(250px, 1fr) 3fr' }}>
                                 <aside className="grid">
@@ -207,6 +213,7 @@ function App() {
                                             <AttendanceTable
                                                 seccionId={selectedSeccion}
                                                 fecha={selectedDate}
+                                                periodo={periodo}
                                                 onSave={handleAttendanceSave}
                                             />
                                         </div>
@@ -221,27 +228,29 @@ function App() {
                     ) : currentView === 'students' ? (
                         <StudentsPage />
                     ) : currentView === 'cotidiano' ? (
-                        <TrabajoCotidianoPage />
+                        <TrabajoCotidianoPage periodo={periodo} />
                     ) : currentView === 'tareas' ? (
-                        <TareasPage />
+                        <TareasPage periodo={periodo} />
                     ) : currentView === 'asistencia_nota' ? (
                         <div style={{ paddingTop: '2rem' }}>
                             {selectedSeccion && (
                                 <AttendanceSummary
                                     seccionId={selectedSeccion}
+                                    periodo={periodo}
                                     onClose={() => setCurrentView('attendance')}
                                 />
                             )}
                         </div>
                     ) : currentView === 'reports' ? (
-                        <FinalReportPage />
+                        <FinalReportPage periodo={periodo} />
                     ) : (
-                        <ExamenesPage />
+                        <ExamenesPage periodo={periodo} />
                     )}
 
                     {showReport && selectedSeccion && (
                         <SummaryReport
                             seccionId={selectedSeccion}
+                            periodo={periodo}
                             onClose={() => setShowReport(false)}
                         />
                     )}
@@ -249,6 +258,7 @@ function App() {
                     {showAttendanceSummary && selectedSeccion && (
                         <AttendanceSummary
                             seccionId={selectedSeccion}
+                            periodo={periodo}
                             onClose={() => setShowAttendanceSummary(false)}
                         />
                     )}

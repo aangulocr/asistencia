@@ -3,13 +3,21 @@ import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
 import { useToast } from './Toast';
 import { ExamenSummary } from './ExamenSummary';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+const typedSupabase = supabase as SupabaseClient<Database>;
 
 type Examen = Database['public']['Tables']['examenes']['Row'];
 type IndicadorExamen = Database['public']['Tables']['indicadores_examen']['Row'];
 type Estudiante = Database['public']['Tables']['estudiantes']['Row'];
+type EvaluacionExamen = Database['public']['Tables']['evaluaciones_examen']['Row'];
 
-export const ExamenesPage: React.FC = () => {
-    const [secciones, setSecciones] = useState<any[]>([]);
+interface Props {
+    periodo: number;
+}
+
+export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
+    const [secciones, setSecciones] = useState<Database['public']['Tables']['secciones']['Row'][]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [examenes, setExamenes] = useState<Examen[]>([]);
     const [selectedExamen, setSelectedExamen] = useState<string>('');
@@ -37,7 +45,7 @@ export const ExamenesPage: React.FC = () => {
             fetchExamenes(selectedSeccion);
             fetchEstudiantes(selectedSeccion);
         }
-    }, [selectedSeccion]);
+    }, [selectedSeccion, periodo]);
 
     useEffect(() => {
         if (selectedExamen) {
@@ -49,35 +57,35 @@ export const ExamenesPage: React.FC = () => {
     }, [selectedExamen]);
 
     async function fetchInitialData() {
-        const { data } = await supabase.from('secciones').select('*').order('nombre');
+        const { data } = await typedSupabase.from('secciones').select('*').order('nombre');
         setSecciones(data || []);
-        if (data && data.length > 0) setSelectedSeccion((data[0] as any).id);
+        if (data && data.length > 0) setSelectedSeccion(data[0].id);
     }
 
     async function fetchExamenes(seccionId: string) {
-        const { data } = await (supabase as any).from('examenes').select('*').eq('seccion_id', seccionId).order('id');
+        const { data } = await typedSupabase.from('examenes').select('*').eq('seccion_id', seccionId).eq('periodo', periodo).order('id');
         setExamenes(data || []);
-        if (data && data.length > 0) setSelectedExamen(String((data[0] as any).id));
+        if (data && data.length > 0) setSelectedExamen(String(data[0].id));
         else setSelectedExamen('');
     }
 
     async function fetchEstudiantes(seccionId: string) {
-        const { data } = await supabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
+        const { data } = await typedSupabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
         setEstudiantes(data || []);
     }
 
     async function fetchIndicadoresAndEvaluations(examenId: string) {
         setLoading(true);
-        const { data: indData } = await (supabase as any).from('indicadores_examen').select('*').eq('examen_id', parseInt(examenId)).order('orden');
+        const { data: indData } = await typedSupabase.from('indicadores_examen').select('*').eq('examen_id', parseInt(examenId)).order('orden');
         setIndicadores(indData || []);
 
-        const indIds = (indData || []).map((i: any) => i.id);
-        const { data: evalData } = await (supabase as any).from('evaluaciones_examen').select('*').in('indicador_id', indIds);
+        const indIds = (indData || []).map(i => i.id);
+        const { data: evalData } = await typedSupabase.from('evaluaciones_examen').select('*').in('indicador_id', indIds);
 
         const evalMap: Record<string, Record<string, number>> = {};
-        (evalData || []).forEach((ev: any) => {
+        (evalData || []).forEach(ev => {
             if (!evalMap[ev.estudiante_id]) evalMap[ev.estudiante_id] = {};
-            evalMap[ev.estudiante_id][ev.indicador_id] = ev.puntaje!;
+            evalMap[ev.estudiante_id][ev.indicador_id] = ev.puntaje || 0;
         });
         setEvaluaciones(evalMap);
         setLoading(false);
@@ -121,7 +129,7 @@ export const ExamenesPage: React.FC = () => {
     async function saveEvaluations() {
         setIsSaving(true);
         try {
-            const upsertData: any[] = [];
+            const upsertData: Database['public']['Tables']['evaluaciones_examen']['Insert'][] = [];
             estudiantes.forEach(est => {
                 const estEvals = evaluaciones[est.cedula] || {};
                 indicadores.forEach(ind => {
@@ -132,7 +140,7 @@ export const ExamenesPage: React.FC = () => {
             });
 
             if (upsertData.length > 0) {
-                const { error } = await (supabase as any).from('evaluaciones_examen').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
+                const { error } = await typedSupabase.from('evaluaciones_examen').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
                 if (error) throw error;
             }
             showToast('Evaluaciones de examen guardadas', 'success');
@@ -153,23 +161,24 @@ export const ExamenesPage: React.FC = () => {
         if (!editNombre) return;
         setLoading(true);
         try {
-            const { data: examen, error: eError } = await (supabase as any).from('examenes').insert({
+            const { data: examen, error: eError } = await typedSupabase.from('examenes').insert({
                 nombre: editNombre,
                 seccion_id: selectedSeccion,
                 porcentaje: editPorcentaje,
-                puntos_totales: editPuntosTotales
+                puntos_totales: editPuntosTotales,
+                periodo: periodo
             }).select().single();
 
             if (eError) throw eError;
 
-            const indsData = editIndicadores.map((ind, idx) => ({
-                examen_id: (examen as any).id,
+            const indsData: Database['public']['Tables']['indicadores_examen']['Insert'][] = editIndicadores.map((ind, idx) => ({
+                examen_id: examen!.id,
                 titulo: ind.titulo,
                 orden: idx + 1,
                 desc_0: ind.d0, desc_1: ind.d1, desc_2: ind.d2, desc_3: ind.d3
             }));
 
-            const { error: indError } = await (supabase as any).from('indicadores_examen').insert(indsData);
+            const { error: indError } = await typedSupabase.from('indicadores_examen').insert(indsData);
             if (indError) throw indError;
 
             showToast('Examen configurado correctamente', 'success');
@@ -357,6 +366,7 @@ export const ExamenesPage: React.FC = () => {
             {showSummary && selectedSeccion && (
                 <ExamenSummary
                     seccionId={selectedSeccion}
+                    periodo={periodo}
                     onClose={() => setShowSummary(false)}
                 />
             )}

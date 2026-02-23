@@ -9,12 +9,13 @@ type Estado = Database['public']['Tables']['estados_asistencia']['Row'];
 interface Props {
     seccionId: string;
     fecha: string;
+    periodo: number;
     onSave?: () => void;
 }
 
 type LessonStatus = 'P' | 'A' | 'T' | 'J';
 
-export function AttendanceTable({ seccionId, fecha, onSave }: Props) {
+export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
     const [asistencias, setAsistencias] = useState<Record<string, LessonStatus[]>>({});
     const [loading, setLoading] = useState(true);
@@ -67,7 +68,7 @@ export function AttendanceTable({ seccionId, fecha, onSave }: Props) {
 
     useEffect(() => {
         loadData();
-    }, [seccionId, fecha]);
+    }, [seccionId, fecha, periodo]);
 
     async function loadData() {
         setLoading(true);
@@ -78,6 +79,7 @@ export function AttendanceTable({ seccionId, fecha, onSave }: Props) {
                 .select('*')
                 .eq('seccion_id', seccionId)
                 .eq('fecha', fecha)
+                .eq('periodo', periodo)
                 .maybeSingle();
 
             const configData = configDataRaw as Database['public']['Tables']['configuracion_diaria']['Row'] | null;
@@ -97,7 +99,8 @@ export function AttendanceTable({ seccionId, fecha, onSave }: Props) {
                 .from('control_asistencia')
                 .select('*')
                 .eq('seccion_id', seccionId)
-                .eq('fecha', fecha);
+                .eq('fecha', fecha)
+                .eq('periodo', periodo);
 
             const attendanceMap: Record<string, LessonStatus[]> = {};
             if (attendanceData) {
@@ -154,8 +157,9 @@ export function AttendanceTable({ seccionId, fecha, onSave }: Props) {
                 .upsert({
                     seccion_id: seccionId,
                     fecha: fecha,
+                    periodo: periodo,
                     lecciones_totales: leccionesTotales
-                }, { onConflict: 'seccion_id, fecha' });
+                }, { onConflict: 'seccion_id, fecha, periodo' });
 
             if (configError) throw configError;
 

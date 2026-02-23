@@ -3,13 +3,20 @@ import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
 import { useToast } from './Toast';
 import { CotidianoSummary } from './CotidianoSummary';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+const typedSupabase = supabase as SupabaseClient<Database>;
 
 type Trabajo = Database['public']['Tables']['trabajos_cotidianos']['Row'];
 type Indicador = Database['public']['Tables']['indicadores']['Row'];
 type Estudiante = Database['public']['Tables']['estudiantes']['Row'];
 type Evaluacion = Database['public']['Tables']['evaluaciones_cotidiano']['Row'];
 
-export const TrabajoCotidianoPage: React.FC = () => {
+interface Props {
+    periodo: number;
+}
+
+export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
     const [secciones, setSecciones] = useState<any[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
@@ -36,7 +43,7 @@ export const TrabajoCotidianoPage: React.FC = () => {
             fetchTrabajos(selectedSeccion);
             fetchEstudiantes(selectedSeccion);
         }
-    }, [selectedSeccion]);
+    }, [selectedSeccion, periodo]);
 
     useEffect(() => {
         if (selectedTrabajo) {
@@ -48,37 +55,37 @@ export const TrabajoCotidianoPage: React.FC = () => {
     }, [selectedTrabajo]);
 
     async function fetchInitialData() {
-        const { data } = await supabase.from('secciones').select('*').order('nombre');
+        const { data } = await typedSupabase.from('secciones').select('*').order('nombre'); // Use typedSupabase
         setSecciones(data || []);
-        if (data && data.length > 0) setSelectedSeccion((data[0] as any).id);
+        if (data && data.length > 0) setSelectedSeccion(data[0].id); // Removed as any
     }
 
     async function fetchTrabajos(seccionId: string) {
-        const { data } = await (supabase as any).from('trabajos_cotidianos').select('*').eq('seccion_id', seccionId).order('id');
+        const { data } = await typedSupabase.from('trabajos_cotidianos').select('*').eq('seccion_id', seccionId).eq('periodo', periodo).order('id');
         setTrabajos(data || []);
-        if (data && data.length > 0) setSelectedTrabajo(String((data[0] as any).id));
+        if (data && data.length > 0) setSelectedTrabajo(String(data[0].id));
         else setSelectedTrabajo('');
     }
 
     async function fetchEstudiantes(seccionId: string) {
-        const { data } = await supabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
+        const { data } = await typedSupabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
         setEstudiantes(data || []);
     }
 
     async function fetchIndicadoresAndEvaluations(trabajoId: string) {
         setLoading(true);
         // Indicators
-        const { data: indData } = await (supabase as any).from('indicadores').select('*').eq('trabajo_id', parseInt(trabajoId)).order('orden');
+        const { data: indData } = await typedSupabase.from('indicadores').select('*').eq('trabajo_id', parseInt(trabajoId)).order('orden'); // Use typedSupabase
         setIndicadores(indData || []);
 
         // Evaluations
-        const indIds = (indData || []).map((i: any) => i.id);
-        const { data: evalData } = await (supabase as any).from('evaluaciones_cotidiano').select('*').in('indicador_id', indIds);
+        const indIds = (indData || []).map(i => i.id); // Removed i: any
+        const { data: evalData } = await typedSupabase.from('evaluaciones_cotidiano').select('*').in('indicador_id', indIds); // Use typedSupabase
 
         const evalMap: Record<string, Record<string, number>> = {};
-        (evalData || []).forEach((ev: any) => {
+        (evalData || []).forEach(ev => { // Removed ev: any
             if (!evalMap[ev.estudiante_id]) evalMap[ev.estudiante_id] = {};
-            evalMap[ev.estudiante_id][ev.indicador_id] = ev.puntaje!;
+            evalMap[ev.estudiante_id][ev.indicador_id] = ev.puntaje || 0; // Handle puntaje possibly being null
         });
         setEvaluaciones(evalMap);
         setLoading(false);
@@ -142,7 +149,7 @@ export const TrabajoCotidianoPage: React.FC = () => {
             });
 
             if (upsertData.length > 0) {
-                const { error } = await (supabase as any).from('evaluaciones_cotidiano').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
+                const { error } = await typedSupabase.from('evaluaciones_cotidiano').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
                 if (error) throw error;
             }
             showToast('Evaluaciones guardadas', 'success');
@@ -170,24 +177,22 @@ export const TrabajoCotidianoPage: React.FC = () => {
         if (!editNombre) return;
         setLoading(true);
         try {
-            const { data: trabajo, error: tcError } = await (supabase as any).from('trabajos_cotidianos').insert({
+            const { data: trabajo, error: tcError } = await typedSupabase.from('trabajos_cotidianos').insert({
                 nombre: editNombre,
-                seccion_id: selectedSeccion
+                seccion_id: selectedSeccion,
+                periodo: periodo
             }).select().single();
 
             if (tcError) throw tcError;
 
-            const indsData = editIndicadores.map((ind, idx) => ({
-                trabajo_id: (trabajo as any).id,
+            const indsData: Database['public']['Tables']['indicadores']['Insert'][] = editIndicadores.map((ind, idx) => ({
+                trabajo_id: trabajo!.id,
                 titulo: ind.titulo,
                 orden: idx + 1,
-                desc_0: ind.d0,
-                desc_1: ind.d1,
-                desc_2: ind.d2,
-                desc_3: ind.d3
+                desc_0: ind.d0, desc_1: ind.d1, desc_2: ind.d2, desc_3: ind.d3
             }));
 
-            const { error: indError } = await (supabase as any).from('indicadores').insert(indsData);
+            const { error: indError } = await typedSupabase.from('indicadores').insert(indsData);
             if (indError) throw indError;
 
             showToast('Trabajo Cotidiano creado', 'success');
@@ -195,9 +200,7 @@ export const TrabajoCotidianoPage: React.FC = () => {
             fetchTrabajos(selectedSeccion);
         } catch (error: any) {
             showToast(`Error: ${error.message}`, 'error');
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     }
 
     return (
@@ -406,6 +409,7 @@ export const TrabajoCotidianoPage: React.FC = () => {
             {showSummary && selectedSeccion && (
                 <CotidianoSummary
                     seccionId={selectedSeccion}
+                    periodo={periodo}
                     onClose={() => setShowSummary(false)}
                 />
             )}

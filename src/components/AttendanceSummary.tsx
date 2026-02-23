@@ -4,10 +4,11 @@ import { Database } from '../types/database';
 
 interface AttendanceSummaryProps {
     seccionId: string;
+    periodo: number;
     onClose: () => void;
 }
 
-export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId, onClose }) => {
+export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId, periodo, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [seccionName, setSeccionName] = useState('');
     const [estudiantes, setEstudiantes] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
 
     useEffect(() => {
         fetchData();
-    }, [seccionId]);
+    }, [seccionId, periodo]);
 
     async function fetchData() {
         setLoading(true);
@@ -34,10 +35,11 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
             const { data: attendanceData } = await supabase
                 .from('control_asistencia')
                 .select('estudiante_id, fecha, estado_id, estados_asistencia(peso_ausencia, es_justificada)')
-                .eq('seccion_id', seccionId);
+                .eq('seccion_id', seccionId)
+                .eq('periodo', periodo);
 
             // 4. Get Daily Configs
-            const { data: configData } = await supabase.from('configuracion_diaria').select('fecha, lecciones_totales').eq('seccion_id', seccionId);
+            const { data: configData } = await supabase.from('configuracion_diaria').select('fecha, lecciones_totales').eq('seccion_id', seccionId).eq('periodo', periodo);
             const configMap: Record<string, number> = {};
             configData?.forEach((c: any) => { configMap[c.fecha] = c.lecciones_totales; });
 
@@ -109,7 +111,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
             <div className="glass-card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', position: 'relative', background: '#1e1b4b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="no-print">
-                    <h2 style={{ margin: 0 }}>Cálculo de Asistencia (5%) - {seccionName}</h2>
+                    <h2 style={{ margin: 0 }}>Cálculo de Asistencia (5%) - {seccionName} - Semestre {periodo}</h2>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <button onClick={handlePrint} className="btn-primary" style={{ background: 'var(--primary)' }}>🖨️ Imprimir PDF</button>
                         <button onClick={onClose} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>Cerrar</button>
@@ -118,7 +120,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
 
                 <div className="only-print" style={{ display: 'none', textAlign: 'center', marginBottom: '2rem' }}>
                     <h1 style={{ color: 'black' }}>Reporte de Evaluación de Asistencia - MEP 2026</h1>
-                    <p style={{ color: 'black' }}>Sección: {seccionName} | Valor: 5%</p>
+                    <p style={{ color: 'black' }}>Sección: {seccionName} | Semestre: {periodo} | Valor: 5%</p>
                 </div>
 
                 {loading ? (
@@ -161,14 +163,60 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
                 <style>{`
                     @media print {
                         @page { size: portrait; margin: 15mm; }
-                        body * { visibility: hidden; }
+                        
+                        html, body { 
+                            height: auto !important; 
+                            overflow: visible !important; 
+                            background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        /* Reset layout for print */
+                        .app-layout { display: block !important; }
+                        .sidebar { display: none !important; }
+                        .container { 
+                            padding: 0 !important; 
+                            margin: 0 !important; 
+                            max-width: none !important; 
+                            width: 100% !important; 
+                        }
+
                         .modal-overlay, .modal-overlay * { visibility: visible; }
-                        .modal-overlay { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background: white !important; padding: 0 !important; }
-                        .glass-card { background: white !important; border: none !important; color: black !important; width: 100% !important; max-width: 100% !important; box-shadow: none !important; }
+                        .modal-overlay { 
+                            position: static !important; 
+                            width: 100% !important; 
+                            background: white !important; 
+                            padding: 0 !important; 
+                            display: block !important;
+                            overflow: visible !important;
+                        }
+                        .glass-card { 
+                            background: white !important; 
+                            border: none !important; 
+                            color: black !important; 
+                            width: 100% !important; 
+                            max-width: 100% !important; 
+                            box-shadow: none !important; 
+                            overflow: visible !important;
+                            display: block !important;
+                            backdrop-filter: none !important;
+                            -webkit-backdrop-filter: none !important;
+                        }
                         .no-print { display: none !important; }
                         .only-print { display: block !important; }
-                        table { width: 100% !important; border-collapse: collapse !important; margin-top: 20px !important; }
-                        th, td { border: 1px solid black !important; padding: 8px !important; color: black !important; text-align: center; }
+                        table { 
+                            width: 100% !important; 
+                            border-collapse: collapse !important; 
+                            margin-top: 20px !important; 
+                            table-layout: auto !important;
+                        }
+                        th, td { 
+                            border: 1px solid black !important; 
+                            padding: 8px !important; 
+                            color: black !important; 
+                            text-align: center;
+                            page-break-inside: avoid !important;
+                        }
                         th { background: #eee !important; font-weight: bold !important; }
                         td:first-child { text-align: left !important; }
                         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }

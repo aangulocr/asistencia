@@ -3,10 +3,11 @@ import { supabase } from '../lib/supabase';
 
 interface TareaSummaryProps {
     seccionId: string;
+    periodo: number;
     onClose: () => void;
 }
 
-export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }) => {
+export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [seccionName, setSeccionName] = useState('');
     const [estudiantes, setEstudiantes] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
 
     useEffect(() => {
         fetchData();
-    }, [seccionId]);
+    }, [seccionId, periodo]);
 
     async function fetchData() {
         setLoading(true);
@@ -30,7 +31,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
             setEstudiantes(students);
 
             // Tasks
-            const { data: tarData } = await (supabase as any).from('tareas').select('*').eq('seccion_id', seccionId).order('id');
+            const { data: tarData } = await supabase.from('tareas').select('*').eq('seccion_id', seccionId).eq('periodo', periodo).order('id');
             const tasks = tarData || [];
             setTareas(tasks);
 
@@ -81,7 +82,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
             <div className="glass-card" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', position: 'relative', background: '#1e1b4b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="no-print">
-                    <h2 style={{ margin: 0 }}>Resumen de Tareas - {seccionName}</h2>
+                    <h2 style={{ margin: 0 }}>Resumen de Tareas - {seccionName} - Sem {periodo}</h2>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <button onClick={handlePrint} className="btn-primary" style={{ background: 'var(--primary)' }}>🖨️ Imprimir PDF</button>
                         <button onClick={onClose} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>Cerrar</button>
@@ -90,7 +91,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
 
                 <div className="only-print" style={{ display: 'none', textAlign: 'center', marginBottom: '2rem' }}>
                     <h1 style={{ color: 'black' }}>Reporte de Tareas - MEP 2026</h1>
-                    <h2 style={{ color: 'black' }}>Sección: {seccionName}</h2>
+                    <h2 style={{ color: 'black' }}>Sección: {seccionName} - Semestre: {periodo}</h2>
                 </div>
 
                 {loading ? (
@@ -139,24 +140,37 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
 
                 <style>{`
                     @media print {
-                        @page { 
-                            size: landscape; 
-                            margin: 10mm; 
-                        }
+                        @page { size: landscape; margin: 10mm; }
                         
+                        html, body { 
+                            height: auto !important; 
+                            overflow: visible !important; 
+                            background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        /* Reset layout for print */
+                        .app-layout { display: block !important; }
+                        .sidebar { display: none !important; }
+                        .container { 
+                            padding: 0 !important; 
+                            margin: 0 !important; 
+                            max-width: none !important; 
+                            width: 100% !important; 
+                        }
+
                         /* Ocultar todo lo que no sea el modal */
-                        body * { visibility: hidden; }
-                        .modal-overlay, .modal-overlay * { visibility: visible; }
+                        .no-print { display: none !important; }
+                        .only-print { display: block !important; }
                         
                         /* Posicionar el modal como el elemento principal de la página */
                         .modal-overlay { 
-                            position: absolute !important; 
-                            left: 0 !important; 
-                            top: 0 !important; 
+                            position: static !important; 
                             width: 100% !important; 
                             background: white !important; 
                             padding: 0 !important;
                             display: block !important;
+                            overflow: visible !important;
                         }
                         
                         .glass-card { 
@@ -167,10 +181,11 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
                             max-width: 100% !important;
                             box-shadow: none !important;
                             padding: 0 !important;
+                            overflow: visible !important;
+                            display: block !important;
+                            backdrop-filter: none !important;
+                            -webkit-backdrop-filter: none !important;
                         }
-                        
-                        .no-print { display: none !important; }
-                        .only-print { display: block !important; }
                         
                         h1, h2, h3, p, div, span { color: black !important; }
                         
@@ -180,6 +195,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
                             color: black !important; 
                             font-size: 10pt !important;
                             margin-top: 10px !important;
+                            table-layout: auto !important;
                         }
                         
                         th { 
@@ -193,6 +209,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, onClose }
                             border: 1px solid black !important; 
                             color: black !important; 
                             padding: 8px !important;
+                            page-break-inside: avoid !important;
                         }
                         
                         tr { page-break-inside: avoid; }

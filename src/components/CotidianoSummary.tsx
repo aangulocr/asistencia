@@ -4,10 +4,11 @@ import { Database } from '../types/database';
 
 interface CotidianoSummaryProps {
     seccionId: string;
+    periodo: number;
     onClose: () => void;
 }
 
-export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, onClose }) => {
+export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, periodo, onClose }) => {
     const [seccionNombre, setSeccionNombre] = useState('');
     const [estudiantes, setEstudiantes] = useState<any[]>([]);
     const [trabajos, setTrabajos] = useState<any[]>([]);
@@ -17,7 +18,7 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
 
     useEffect(() => {
         fetchData();
-    }, [seccionId]);
+    }, [seccionId, periodo]);
 
     async function fetchData() {
         setLoading(true);
@@ -30,8 +31,8 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
             const { data: estData } = await supabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
             setEstudiantes(estData || []);
 
-            // 3. Fetch TCs for this section
-            const { data: tcData } = await (supabase as any).from('trabajos_cotidianos').select('*').eq('seccion_id', seccionId).order('id');
+            // 3. Fetch TCs for this section and period
+            const { data: tcData } = await supabase.from('trabajos_cotidianos').select('*').eq('seccion_id', seccionId).eq('periodo', periodo).order('id');
             const currentTrabajos = tcData || [];
             setTrabajos(currentTrabajos);
 
@@ -103,7 +104,7 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
 
                 <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="no-print">
                     <div>
-                        <h2 style={{ fontSize: '1.8rem' }}>Resumen de Notas: {seccionNombre}</h2>
+                        <h2 style={{ fontSize: '1.8rem' }}>Resumen de Notas: {seccionNombre} - Sem {periodo}</h2>
                         <p style={{ color: 'var(--text-muted)' }}>Consolidado de Trabajo Cotidiano ({trabajos.length} trabajos)</p>
                     </div>
                     <button onClick={handlePrint} className="btn-primary" style={{ background: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -114,7 +115,7 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
                 <div className="print-area">
                     <div className="only-print" style={{ marginBottom: '2rem', display: 'none' }}>
                         <h1 style={{ color: 'black', textAlign: 'center' }}>Reporte de Notas - Trabajo Cotidiano</h1>
-                        <h2 style={{ color: 'black', textAlign: 'center' }}>Sección: {seccionNombre}</h2>
+                        <h2 style={{ color: 'black', textAlign: 'center' }}>Sección: {seccionNombre} - Semestre: {periodo}</h2>
                         <p style={{ color: 'black', textAlign: 'center' }}>Fecha de generación: {new Date().toLocaleDateString()}</p>
                     </div>
 
@@ -170,28 +171,44 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
                             margin: 10mm; 
                         }
                         
-                        /* Hide everything by default */
-                        body * {
-                            visibility: hidden;
+                        html, body { 
+                            height: auto !important; 
+                            overflow: visible !important; 
+                            background: white !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+                        /* Reset layout for print */
+                        .app-layout { display: block !important; }
+                        .sidebar { display: none !important; }
+                        .container { 
+                            padding: 0 !important; 
+                            margin: 0 !important; 
+                            max-width: none !important; 
+                            width: 100% !important; 
                         }
                         
-                        /* Show only the modal and its contents */
-                        .modal-overlay, .modal-overlay * {
-                            visibility: visible;
+                        .no-print {
+                            display: none !important;
+                        }
+ 
+                        .only-print {
+                            display: block !important;
+                            color: black !important;
+                            margin-bottom: 2rem !important;
                         }
                         
                         .modal-overlay {
-                            position: absolute !important;
-                            left: 0 !important;
-                            top: 0 !important;
+                            position: static !important;
                             width: 100% !important;
                             height: auto !important;
                             background: white !important;
                             display: block !important;
                             padding: 0 !important;
                             margin: 0 !important;
+                            overflow: visible !important;
                         }
-
+ 
                         .glass-card {
                             background: white !important;
                             color: black !important;
@@ -200,37 +217,33 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ seccionId, o
                             width: 100% !important;
                             max-width: 100% !important;
                             padding: 0 !important;
-                        }
-                        
-                        .no-print {
-                            display: none !important;
-                        }
-
-                        .only-print {
+                            overflow: visible !important;
                             display: block !important;
-                            color: black !important;
-                            margin-bottom: 2rem !important;
+                            backdrop-filter: none !important;
+                            -webkit-backdrop-filter: none !important;
                         }
-
+ 
                         table {
                             width: 100% !important;
                             border-collapse: collapse !important;
                             color: black !important;
                             font-size: 9pt !important;
+                            table-layout: auto !important;
                         }
-
+ 
                         th {
                             color: black !important;
                             border-bottom: 2px solid black !important;
                             padding: 8px !important;
                         }
-
+ 
                         td {
                             color: black !important;
                             border-bottom: 1px solid #ccc !important;
                             padding: 6px !important;
+                            page-break-inside: avoid !important;
                         }
-
+ 
                         /* Ensure text colors are printed */
                         * {
                             -webkit-print-color-adjust: exact !important;

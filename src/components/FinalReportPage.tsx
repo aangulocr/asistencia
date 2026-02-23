@@ -2,9 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
 import { Database } from '../types/database';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+const typedSupabase = supabase as SupabaseClient<Database>;
 
 type Seccion = Database['public']['Tables']['secciones']['Row'];
 type Estudiante = Database['public']['Tables']['estudiantes']['Row'];
+type TrabajoCotidiano = Database['public']['Tables']['trabajos_cotidianos']['Row'];
+type IndicadorCotidiano = Database['public']['Tables']['indicadores']['Row'];
+type Tarea = Database['public']['Tables']['tareas']['Row'];
+type IndicadorTarea = Database['public']['Tables']['indicadores_tarea']['Row'];
+type Examen = Database['public']['Tables']['examenes']['Row'];
+type IndicadorExamen = Database['public']['Tables']['indicadores_examen']['Row'];
+type ConfiguracionDiaria = Database['public']['Tables']['configuracion_diaria']['Row'];
+type EvaluacionCotidiano = Database['public']['Tables']['evaluaciones_cotidiano']['Row'];
+type EvaluacionTarea = Database['public']['Tables']['evaluaciones_tarea']['Row'];
+type EvaluacionExamen = Database['public']['Tables']['evaluaciones_examen']['Row'];
 
 interface ConsolidatedStudent {
     cedula: string;
@@ -16,27 +29,25 @@ interface ConsolidatedStudent {
     total: string;
 }
 
-type TCId = { id: number };
-type TCIng = { id: string, trabajo_id: number };
-type Eval = Database['public']['Tables']['evaluaciones_cotidiano']['Row'];
-type TareaRow = Database['public']['Tables']['tareas']['Row'];
-type TareaInd = Database['public']['Tables']['indicadores_tarea']['Row'];
-type ExamenRow = Database['public']['Tables']['examenes']['Row'];
-type ExamenInd = Database['public']['Tables']['indicadores_examen']['Row'];
-type ConfigRow = Database['public']['Tables']['configuracion_diaria']['Row'];
-type AttRow = {
+interface AttRowJoined {
     estudiante_id: string;
     fecha: string;
+    periodo: number;
     estado_id: number;
-    estados_asistencia: { peso_ausencia: number, es_justificada: boolean }
-};
+    estados_asistencia: { peso_ausencia: number, es_justificada: boolean } | null;
+}
 
-export const FinalReportPage: React.FC = () => {
+interface Props {
+    periodo: number;
+}
+
+export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
     const [secciones, setSecciones] = useState<Seccion[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState<'semester' | 'annual'>('semester');
     const [reportData, setReportData] = useState<ConsolidatedStudent[]>([]);
     const { showToast } = useToast();
 
@@ -48,10 +59,10 @@ export const FinalReportPage: React.FC = () => {
         if (selectedSeccion) {
             fetchReportData(selectedSeccion);
         }
-    }, [selectedSeccion]);
+    }, [selectedSeccion, periodo, viewMode]);
 
     async function fetchInitialData() {
-        const { data } = await supabase.from('secciones').select('*').order('nombre') as { data: Seccion[] | null };
+        const { data } = await typedSupabase.from('secciones').select('*').order('nombre') as { data: Seccion[] | null };
         setSecciones(data || []);
         if (data && data.length > 0) setSelectedSeccion(data[0].id);
     }
@@ -60,117 +71,142 @@ export const FinalReportPage: React.FC = () => {
         setLoading(true);
         try {
             // 1. Get Students
-            const { data: estData } = await supabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos') as { data: Estudiante[] | null };
-            const students = estData || [];
+            const { data: estData } = await typedSupabase.from('estudiantes').select('*').eq('seccion_id', seccionId).order('apellidos');
+            const students: Estudiante[] = estData || [];
 
-            // 2. Get All Evaluations
-            // 2.1 Cotidiano
-            const { data: tcData } = await supabase.from('trabajos_cotidianos').select('id').eq('seccion_id', seccionId) as { data: { id: number }[] | null };
+            // 2. Determine periods to fetch
+            const periodsToFetch = viewMode === 'semester' ? [periodo] : [1, 2];
+
+            // 3. Fetch all evaluation components for required periods
+            const { data: tcData } = await typedSupabase.from('trabajos_cotidianos').select('*').eq('seccion_id', seccionId).in('periodo', periodsToFetch) as { data: TrabajoCotidiano[] | null };
+            const { data: tarData } = await typedSupabase.from('tareas').select('*').eq('seccion_id', seccionId).in('periodo', periodsToFetch) as { data: Tarea[] | null };
+            const { data: exData } = await typedSupabase.from('examenes').select('*').eq('seccion_id', seccionId).in('periodo', periodsToFetch) as { data: Examen[] | null };
+            const { data: attData } = await typedSupabase.from('control_asistencia').select('estudiante_id, fecha, periodo, estado_id, estados_asistencia(peso_ausencia, es_justificada)').eq('seccion_id', seccionId).in('periodo', periodsToFetch) as { data: AttRowJoined[] | null };
+            const { data: configData } = await typedSupabase.from('configuracion_diaria').select('fecha, periodo, lecciones_totales').eq('seccion_id', seccionId).in('periodo', periodsToFetch) as { data: ConfiguracionDiaria[] | null };
+
+            // Additional data for cotidiano
             const tcIds = (tcData || []).map(t => t.id);
-            const { data: tcIndData } = await supabase.from('indicadores').select('id, trabajo_id').in('trabajo_id', tcIds) as { data: any[] | null };
+            const { data: tcIndData } = await typedSupabase.from('indicadores').select('id, trabajo_id').in('trabajo_id', tcIds) as { data: IndicadorCotidiano[] | null };
             const tcIndIds = (tcIndData || []).map(i => i.id);
-            const { data: tcEvalData } = await supabase.from('evaluaciones_cotidiano').select('*').in('indicador_id', tcIndIds) as { data: any[] | null };
+            const { data: tcEvalData } = await typedSupabase.from('evaluaciones_cotidiano').select('*').in('indicador_id', tcIndIds) as { data: EvaluacionCotidiano[] | null };
 
-            // 2.2 Tareas
-            const { data: tarData } = await supabase.from('tareas').select('*').eq('seccion_id', seccionId) as { data: any[] | null };
+            // Additional data for tasks/exams
             const tarIds = (tarData || []).map(t => t.id);
-            const { data: tarIndData } = await supabase.from('indicadores_tarea').select('id, tarea_id').in('tarea_id', tarIds) as { data: any[] | null };
+            const { data: tarIndData } = await typedSupabase.from('indicadores_tarea').select('id, tarea_id').in('tarea_id', tarIds) as { data: IndicadorTarea[] | null };
             const tarIndIds = (tarIndData || []).map(i => i.id);
-            const { data: tarEvalData } = await supabase.from('evaluaciones_tarea').select('*').in('indicador_id', tarIndIds) as { data: any[] | null };
+            const { data: tarEvalData } = await typedSupabase.from('evaluaciones_tarea').select('*').in('indicador_id', tarIndIds) as { data: EvaluacionTarea[] | null };
 
-            // 2.3 Examenes
-            const { data: exData } = await supabase.from('examenes').select('*').eq('seccion_id', seccionId) as { data: any[] | null };
             const exIds = (exData || []).map(e => e.id);
-            const { data: exIndData } = await supabase.from('indicadores_examen').select('id, examen_id').in('examen_id', exIds) as { data: any[] | null };
+            const { data: exIndData } = await typedSupabase.from('indicadores_examen').select('id, examen_id').in('examen_id', exIds) as { data: IndicadorExamen[] | null };
             const exIndIds = (exIndData || []).map(i => i.id);
-            const { data: exEvalData } = await supabase.from('evaluaciones_examen').select('*').in('indicador_id', exIndIds) as { data: any[] | null };
-
-            // 2.4 Asistencia
-            const { data: attData } = await supabase.from('control_asistencia').select('estudiante_id, fecha, estado_id, estados_asistencia(peso_ausencia, es_justificada)').eq('seccion_id', seccionId) as { data: AttRow[] | null };
-            const { data: configData } = await supabase.from('configuracion_diaria').select('fecha, lecciones_totales').eq('seccion_id', seccionId) as { data: ConfigRow[] | null };
+            const { data: exEvalData } = await typedSupabase.from('evaluaciones_examen').select('*').in('indicador_id', exIndIds) as { data: EvaluacionExamen[] | null };
 
             const configMap: Record<string, number> = {};
-            (configData || []).forEach(c => { configMap[c.fecha] = c.lecciones_totales; });
+            (configData || []).forEach(c => { configMap[`${c.fecha}-${c.periodo}`] = c.lecciones_totales; });
 
-            const uniqueDates = Array.from(new Set((attData || []).map(a => a.fecha)));
-            let totalProgrammedLessons = 0;
-            uniqueDates.forEach(d => { totalProgrammedLessons += configMap[d] || 4; });
-
-            // 3. Process each student
+            // 4. Group data by student and calculate
             const consolidated = students.map((est: Estudiante) => {
-                // Cotidiano (35%)
-                let tcAverage = 0;
-                if (tcIds && tcIds.length > 0) {
-                    let sumOfPercentages = 0;
-                    tcIds.forEach((tcId: number) => {
-                        const tcIndsForThis = (tcIndData || []).filter((i: any) => i.trabajo_id === tcId).map((i: any) => i.id);
-                        if (tcIndsForThis.length > 0) {
-                            const studentEvals = (tcEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && tcIndsForThis.includes(ev.indicador_id));
-                            const points = studentEvals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                            const max = tcIndsForThis.length * 3;
-                            sumOfPercentages += (points / max) * 100;
-                        }
-                    });
-                    tcAverage = (sumOfPercentages / tcIds.length) || 0;
-                }
-                const tcObtained = (tcAverage / 100) * 35;
+                const getGradesForPeriod = (p: number) => {
+                    const currentTCs = (tcData || []).filter(t => t.periodo === p);
+                    const currentTCIds = currentTCs.map(t => t.id);
 
-                // Tareas (10%)
-                let tarObtained = 0;
-                if (tarData && tarData.length > 0) {
-                    (tarData as any[]).forEach((tar: any) => {
-                        const inds = (tarIndData || []).filter((i: any) => i.tarea_id === tar.id).map((i: any) => i.id);
-                        const evals = (tarEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
-                        const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                        tarObtained += (points / tar.puntos_totales) * tar.porcentaje;
-                    });
-                }
-
-                // Examenes (50%)
-                let exObtained = 0;
-                if (exData && exData.length > 0) {
-                    (exData as any[]).forEach((ex: any) => {
-                        const inds = (exIndData || []).filter((i: any) => i.examen_id === ex.id).map((i: any) => i.id);
-                        const evals = (exEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
-                        const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                        exObtained += (points / ex.puntos_totales) * ex.porcentaje;
-                    });
-                }
-
-                // Asistencia (5%)
-                const studentAtt = (attData || []).filter(a => a.estudiante_id === est.cedula);
-                let totalWeight = 0;
-                studentAtt.forEach(att => {
-                    if (!att.estados_asistencia?.es_justificada) {
-                        const lessonsToday = configMap[att.fecha] || 4;
-                        let weight = att.estados_asistencia?.peso_ausencia || 0;
-                        if (lessonsToday < 4 && weight > 0) {
-                            weight = (weight / 4) * lessonsToday;
-                        }
-                        totalWeight += weight;
+                    // Cotidiano (35%)
+                    let tcAverage = 0;
+                    if (currentTCIds.length > 0) {
+                        let sumOfPercentages = 0;
+                        currentTCIds.forEach((tcId: number) => {
+                            const tcIndsForThis = (tcIndData || []).filter((i: any) => i.trabajo_id === tcId).map((i: any) => i.id);
+                            if (tcIndsForThis.length > 0) {
+                                const studentEvals = (tcEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && tcIndsForThis.includes(ev.indicador_id));
+                                const points = studentEvals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                                const max = tcIndsForThis.length * 3;
+                                sumOfPercentages += (points / max) * 100;
+                            }
+                        });
+                        tcAverage = (sumOfPercentages / currentTCIds.length) || 0;
                     }
-                });
-                const flooredAbsences = Math.floor(totalWeight);
-                const absenteeismPercentage = totalProgrammedLessons > 0 ? (flooredAbsences / totalProgrammedLessons) * 100 : 0;
-                let attObtained = 0;
-                if (absenteeismPercentage < 10) attObtained = 5;
-                else if (absenteeismPercentage < 20) attObtained = 4;
-                else if (absenteeismPercentage < 30) attObtained = 3;
-                else if (absenteeismPercentage < 40) attObtained = 2;
-                else if (absenteeismPercentage < 50) attObtained = 1;
-                else attObtained = 0;
+                    const tcObtained = (tcAverage / 100) * 35;
 
-                const totalFinal = tcObtained + tarObtained + exObtained + attObtained;
+                    // Tareas (10%)
+                    let tarObtained = 0;
+                    const currentTareas = (tarData || []).filter((t: any) => t.periodo === p);
+                    if (currentTareas.length > 0) {
+                        currentTareas.forEach((tar: any) => {
+                            const inds = (tarIndData || []).filter((i: any) => i.tarea_id === tar.id).map((i: any) => i.id);
+                            const evals = (tarEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
+                            const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                            tarObtained += (points / tar.puntos_totales) * tar.porcentaje;
+                        });
+                    }
 
-                return {
-                    cedula: est.cedula,
-                    nombreCompleto: `${est.apellidos} ${est.nombre}`,
-                    cotidiano: tcObtained.toFixed(2),
-                    tareas: tarObtained.toFixed(2),
-                    examenes: exObtained.toFixed(2),
-                    asistencia: attObtained.toFixed(2),
-                    total: totalFinal.toFixed(2)
+                    // Examenes (50%)
+                    let exObtained = 0;
+                    const currentExams = (exData || []).filter((e: any) => e.periodo === p);
+                    if (currentExams.length > 0) {
+                        currentExams.forEach((ex: any) => {
+                            const inds = (exIndData || []).filter((i: any) => i.examen_id === ex.id).map((i: any) => i.id);
+                            const evals = (exEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
+                            const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                            exObtained += (points / ex.puntos_totales) * ex.porcentaje;
+                        });
+                    }
+
+                    // Asistencia (5%)
+                    const studentAtt = (attData || []).filter((a: any) => a.estudiante_id === est.cedula && a.periodo === p);
+                    const currentConfigs = (configData || []).filter((c: any) => c.periodo === p);
+                    const uniqueDatesForPeriod = Array.from(new Set(currentConfigs.map((c: any) => c.fecha)));
+                    let totalProgrammedLessonsForPeriod = 0;
+                    uniqueDatesForPeriod.forEach((d: any) => { totalProgrammedLessonsForPeriod += configMap[`${d}-${p}`] || 4; });
+
+                    let totalWeight = 0;
+                    studentAtt.forEach((att: any) => {
+                        if (!att.estados_asistencia?.es_justificada) {
+                            const lessonsToday = configMap[`${att.fecha}-${p}`] || 4;
+                            let weight = att.estados_asistencia?.peso_ausencia || 0;
+                            if (lessonsToday < 4 && weight > 0) {
+                                weight = (weight / 4) * lessonsToday;
+                            }
+                            totalWeight += weight;
+                        }
+                    });
+                    const flooredAbsences = Math.floor(totalWeight);
+                    const absenteeismPercentage = totalProgrammedLessonsForPeriod > 0 ? (flooredAbsences / totalProgrammedLessonsForPeriod) * 100 : 0;
+                    let attObtained = 0;
+                    if (absenteeismPercentage < 10) attObtained = 5;
+                    else if (absenteeismPercentage < 20) attObtained = 4;
+                    else if (absenteeismPercentage < 30) attObtained = 3;
+                    else if (absenteeismPercentage < 40) attObtained = 2;
+                    else if (absenteeismPercentage < 50) attObtained = 1;
+                    else attObtained = 0;
+
+                    return { tcObtained, tarObtained, exObtained, attObtained, total: tcObtained + tarObtained + exObtained + attObtained };
                 };
+
+                if (viewMode === 'semester') {
+                    const g = getGradesForPeriod(periodo);
+                    return {
+                        cedula: est.cedula,
+                        nombreCompleto: `${est.apellidos} ${est.nombre}`,
+                        cotidiano: g.tcObtained.toFixed(2),
+                        tareas: g.tarObtained.toFixed(2),
+                        examenes: g.exObtained.toFixed(2),
+                        asistencia: g.attObtained.toFixed(2),
+                        total: g.total.toFixed(2)
+                    };
+                } else {
+                    const g1 = getGradesForPeriod(1);
+                    const g2 = getGradesForPeriod(2);
+                    const annualTotal = (g1.total + g2.total) / 2;
+                    return {
+                        cedula: est.cedula,
+                        nombreCompleto: `${est.apellidos} ${est.nombre}`,
+                        cotidiano: ((g1.tcObtained + g2.tcObtained) / 2).toFixed(2),
+                        tareas: ((g1.tarObtained + g2.tarObtained) / 2).toFixed(2),
+                        examenes: ((g1.exObtained + g2.exObtained) / 2).toFixed(2),
+                        asistencia: ((g1.attObtained + g2.attObtained) / 2).toFixed(2),
+                        total: annualTotal.toFixed(2)
+                    };
+                }
             });
 
             setReportData(consolidated);
@@ -220,10 +256,44 @@ export const FinalReportPage: React.FC = () => {
         <div className="report-page">
             <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Reporte Final de Notas</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>Consolidado académico semestral (Base 100%).</p>
+                    <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+                        {viewMode === 'semester' ? `Reporte Final de Notas - Semestre ${periodo}` : 'Reporte Consolidado Anual'}
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)' }}>
+                        {viewMode === 'semester' ? 'Consolidado académico semestral (Base 100%).' : 'Promedio ponderado de ambos semestres (50% cada uno).'}
+                    </p>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem' }} className="no-print">
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }} className="no-print">
+                    <div className="glass-card" style={{ display: 'flex', padding: '0.25rem', gap: '0.25rem' }}>
+                        <button
+                            onClick={() => setViewMode('semester')}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                background: viewMode === 'semester' ? 'var(--primary)' : 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem'
+                            }}
+                        >
+                            Vista Semestral
+                        </button>
+                        <button
+                            onClick={() => setViewMode('annual')}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                background: viewMode === 'annual' ? 'var(--primary)' : 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem'
+                            }}
+                        >
+                            Vista Anual
+                        </button>
+                    </div>
                     <select
                         value={selectedSeccion}
                         onChange={e => setSelectedSeccion(e.target.value)}
@@ -302,14 +372,56 @@ export const FinalReportPage: React.FC = () => {
             <style>{`
                 @media print {
                     @page { size: landscape; margin: 10mm; }
-                    body * { visibility: hidden; }
-                    .report-page, .report-page * { visibility: visible; }
-                    .report-page { position: absolute; left: 0; top: 0; width: 100%; padding: 0; background: white; }
-                    .glass-card { background: white !important; border: none !important; color: black !important; box-shadow: none !important; }
+                    html, body { 
+                        height: auto !important; 
+                        overflow: visible !important; 
+                        background: white !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    /* Reset layout for print */
+                    .app-layout { display: block !important; }
+                    .sidebar { display: none !important; }
+                    .container { 
+                        padding: 0 !important; 
+                        margin: 0 !important; 
+                        max-width: none !important; 
+                        width: 100% !important; 
+                    }
+                    
                     .no-print { display: none !important; }
                     .only-print { display: block !important; }
-                    table { width: 100% !important; border-collapse: collapse !important; color: black !important; }
-                    th, td { border: 1px solid black !important; padding: 8px !important; color: black !important; }
+                    
+                    .report-page { 
+                        position: static !important; 
+                        width: 100% !important; 
+                        padding: 0 !important; 
+                        background: white !important; 
+                        display: block !important;
+                        overflow: visible !important;
+                    }
+                    .glass-card { 
+                        background: white !important; 
+                        border: none !important; 
+                        color: black !important; 
+                        box-shadow: none !important; 
+                        overflow: visible !important;
+                        display: block !important;
+                        backdrop-filter: none !important;
+                        -webkit-backdrop-filter: none !important;
+                    }
+                    table { 
+                        width: 100% !important; 
+                        border-collapse: collapse !important; 
+                        color: black !important;
+                        table-layout: auto !important;
+                    }
+                    th, td { 
+                        border: 1px solid black !important; 
+                        padding: 8px !important; 
+                        color: black !important;
+                        page-break-inside: avoid !important;
+                    }
                     th { background: #f0f0f0 !important; }
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }
