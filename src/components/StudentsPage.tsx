@@ -66,11 +66,40 @@ export const StudentsPage: React.FC = () => {
 
         // Validar nombre del archivo (ej. 10-1.xlsx)
         const fileName = file.name.split('.')[0];
-        const seccionEncontrada = secciones.find(s => s.nombre === fileName);
+        let seccionEncontrada = secciones.find(s => s.nombre === fileName);
 
         if (!seccionEncontrada) {
-            showToast(`El nombre del archivo "${file.name}" no coincide con ninguna sección (ej. 10-1.xlsx). Por favor cámbialo.`, 'error');
-            return;
+            // Intentar inferir nivel
+            const match = fileName.match(/^(10|11)-/);
+            if (!match) {
+                showToast(`El nombre del archivo "${file.name}" no tiene un formato válido (ej. 10-1.xlsx o 11-2.xlsx).`, 'error');
+                return;
+            }
+
+            const nivelInferido = parseInt(match[1]);
+            const confirmacion = confirm(`La sección "${fileName}" no existe. ¿Deseas crearla automáticamente como nivel ${nivelInferido === 10 ? 'Décimo' : 'Undécimo'} e importar los estudiantes?`);
+
+            if (!confirmacion) return;
+
+            setImporting(true);
+            try {
+                const { data: nuevaSeccion, error: createError } = await supabase
+                    .from('secciones')
+                    .insert({ nombre: fileName, nivel: nivelInferido })
+                    .select()
+                    .single();
+
+                if (createError) throw createError;
+
+                // Actualizar lista de secciones localmente
+                const { data: todasSecciones } = await supabase.from('secciones').select('*').order('nombre');
+                setSecciones(todasSecciones || []);
+                seccionEncontrada = nuevaSeccion as Seccion;
+            } catch (error: any) {
+                showToast(`Error al crear la sección: ${error.message}`, 'error');
+                setImporting(false);
+                return;
+            }
         }
 
         setImporting(true);

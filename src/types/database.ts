@@ -34,9 +34,9 @@ export interface Database {
                 Relationships: []
             }
             configuracion_diaria: {
-                Row: { id: string; seccion_id: string; fecha: string; lecciones_totales: number; periodo: number }
-                Insert: { id?: string; seccion_id: string; fecha: string; lecciones_totales: number; periodo?: number }
-                Update: { id?: string; seccion_id?: string; fecha?: string; lecciones_totales?: number; periodo?: number }
+                Row: { id: string; seccion_id: string; fecha: string; lecciones_totales: number; periodo: number; observaciones: string | null }
+                Insert: { id?: string; seccion_id: string; fecha: string; lecciones_totales: number; periodo?: number; observaciones?: string | null }
+                Update: { id?: string; seccion_id?: string; fecha?: string; lecciones_totales?: number; periodo?: number; observaciones?: string | null }
                 Relationships: []
             }
             trabajos_cotidianos: {

@@ -243,9 +243,30 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
                                 {trabajos.length === 0 && <option value="">No hay trabajos creados</option>}
                             </select>
                         </div>
-                        <button onClick={saveEvaluations} disabled={isSaving || !selectedTrabajo} className="btn-primary">
-                            {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={saveEvaluations} disabled={isSaving || !selectedTrabajo} className="btn-primary">
+                                {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
+                            </button>
+                            {selectedTrabajo && (
+                                <button
+                                    onClick={async () => {
+                                        if (confirm('¿Estás seguro de eliminar este trabajo cotidiano y todas sus notas?')) {
+                                            const { error } = await supabase.from('trabajos_cotidianos').delete().eq('id', parseInt(selectedTrabajo));
+                                            if (error) {
+                                                showToast(`Error al eliminar: ${error.message}`, 'error');
+                                            } else {
+                                                showToast('Trabajo eliminado correctamente', 'success');
+                                                fetchTrabajos(selectedSeccion);
+                                            }
+                                        }
+                                    }}
+                                    className="btn-primary"
+                                    style={{ background: 'var(--danger)', opacity: 0.8 }}
+                                >
+                                    🗑️ Eliminar
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {selectedTrabajo && (

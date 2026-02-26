@@ -23,18 +23,20 @@ function App() {
     const [secciones, setSecciones] = useState<Seccion[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string | null>(null);
     const [selectedNivel, setSelectedNivel] = useState<number>(10);
-    const [selectedDate, setSelectedDate] = useState<string>('2026-02-02');
+    const today = new Date().toLocaleDateString('en-CA');
+    const maxDate = today < '2026-11-30' ? today : '2026-11-30';
+    const initialDate = today >= '2026-02-02' && today <= '2026-11-30' ? today : '2026-02-02';
+    const [selectedDate, setSelectedDate] = useState<string>(initialDate);
     const [periodo, setPeriodo] = useState<number>(1);
     const [showReport, setShowReport] = useState(false);
     const [showAttendanceSummary, setShowAttendanceSummary] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
-    const today = new Date().toLocaleDateString('en-CA');
-    const maxDate = today < '2026-11-30' ? today : '2026-11-30';
+
 
     useEffect(() => {
         fetchSecciones();
-    }, []);
+    }, [currentView]);
 
     async function fetchSecciones() {
         const { data, error } = await supabase.from('secciones').select('*').order('nombre');
@@ -71,6 +73,23 @@ function App() {
 
     const handleAttendanceSave = () => {
         setRefreshKey(prev => prev + 1);
+    };
+
+    const handleDeleteSeccion = async (id: string, nombre: string) => {
+        if (!confirm(`¿Estás seguro de eliminar la sección "${nombre}"? \n\n¡ESTA ACCIÓN ES PERMANENTE e incluye a todos sus estudiantes, notas y asistencia!`)) {
+            return;
+        }
+
+        const { error } = await supabase.from('secciones').delete().eq('id', id);
+        if (error) {
+            alert(`Error al eliminar sección: ${error.message}`);
+        } else {
+            console.log('Sección eliminada');
+            fetchSecciones();
+            if (selectedSeccion === id) {
+                setSelectedSeccion(null);
+            }
+        }
     };
 
     return (
@@ -143,18 +162,41 @@ function App() {
                                             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Sección</label>
                                             <div className="grid" style={{ gap: '0.5rem' }}>
                                                 {filteredSecciones.map(s => (
-                                                    <button
-                                                        key={s.id}
-                                                        onClick={() => setSelectedSeccion(s.id)}
-                                                        className="btn-primary"
-                                                        style={{
-                                                            background: selectedSeccion === s.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                                                            textAlign: 'left',
-                                                            padding: '0.75rem'
-                                                        }}
-                                                    >
-                                                        {s.nombre}
-                                                    </button>
+                                                    <div key={s.id} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button
+                                                            onClick={() => setSelectedSeccion(s.id)}
+                                                            className="btn-primary"
+                                                            style={{
+                                                                background: selectedSeccion === s.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                                                textAlign: 'left',
+                                                                padding: '0.75rem',
+                                                                flex: 1
+                                                            }}
+                                                        >
+                                                            {s.nombre}
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteSeccion(s.id, s.nombre);
+                                                            }}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: 'var(--danger)',
+                                                                cursor: 'pointer',
+                                                                fontSize: '1rem',
+                                                                padding: '0.5rem',
+                                                                opacity: 0.6,
+                                                                transition: 'opacity 0.2s'
+                                                            }}
+                                                            onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                                            onMouseOut={e => e.currentTarget.style.opacity = '0.6'}
+                                                            title="Eliminar Sección"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>

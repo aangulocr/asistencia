@@ -21,6 +21,7 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [leccionesTotales, setLeccionesTotales] = useState<number>(4);
+    const [observaciones, setObservaciones] = useState<string>('');
     const { showToast } = useToast();
 
     const lessonColors: Record<LessonStatus, string> = {
@@ -84,8 +85,13 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
 
             const configData = configDataRaw as Database['public']['Tables']['configuracion_diaria']['Row'] | null;
 
-            if (configData) setLeccionesTotales(configData.lecciones_totales);
-            else setLeccionesTotales(4);
+            if (configData) {
+                setLeccionesTotales(configData.lecciones_totales);
+                setObservaciones(configData.observaciones || '');
+            } else {
+                setLeccionesTotales(4);
+                setObservaciones('');
+            }
 
             // 2. Load students
             const { data: studentsData } = await supabase
@@ -158,7 +164,8 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                     seccion_id: seccionId,
                     fecha: fecha,
                     periodo: periodo,
-                    lecciones_totales: leccionesTotales
+                    lecciones_totales: leccionesTotales,
+                    observaciones: observaciones
                 }, { onConflict: 'seccion_id, fecha, periodo' });
 
             if (configError) throw configError;
@@ -230,6 +237,32 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                 >
                     {isSaving ? '⌛ Guardando...' : '💾 Guardar Asistencia'}
                 </button>
+            </div>
+
+            <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.75rem' }}>
+                    Observaciones del Grupo:
+                </label>
+                <textarea
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    placeholder="Escriba aquí cualquier observación relevante sobre la sección o la lección de hoy..."
+                    style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border)',
+                        borderRadius: '8px',
+                        padding: '0.75rem',
+                        color: 'white',
+                        fontSize: '0.9rem',
+                        resize: 'vertical',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--glass-border)'}
+                />
             </div>
 
             <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>

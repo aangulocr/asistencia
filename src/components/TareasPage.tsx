@@ -236,9 +236,30 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                                 </div>
                             )}
                         </div>
-                        <button onClick={saveEvaluations} disabled={isSaving || !selectedTarea} className="btn-primary">
-                            {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={saveEvaluations} disabled={isSaving || !selectedTarea} className="btn-primary">
+                                {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
+                            </button>
+                            {selectedTarea && (
+                                <button
+                                    onClick={async () => {
+                                        if (confirm('¿Estás seguro de eliminar esta tarea y todas sus notas?')) {
+                                            const { error } = await supabase.from('tareas').delete().eq('id', parseInt(selectedTarea));
+                                            if (error) {
+                                                showToast(`Error al eliminar: ${error.message}`, 'error');
+                                            } else {
+                                                showToast('Tarea eliminada correctamente', 'success');
+                                                fetchTareas(selectedSeccion);
+                                            }
+                                        }
+                                    }}
+                                    className="btn-primary"
+                                    style={{ background: 'var(--danger)', opacity: 0.8 }}
+                                >
+                                    🗑️ Eliminar
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {selectedTarea && (

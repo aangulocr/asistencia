@@ -90,7 +90,7 @@ DROP POLICY IF EXISTS "Authenticated update attendance" ON control_asistencia;
 
 
 -- Select policies (Public read/write for development/anon access)
-CREATE POLICY "Public read sections" ON secciones FOR SELECT USING (true);
+CREATE POLICY "Public full access sections" ON secciones FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public read states" ON estados_asistencia FOR SELECT USING (true);
 CREATE POLICY "Public full access students" ON estudiantes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public full access attendance" ON control_asistencia FOR ALL USING (true) WITH CHECK (true);
