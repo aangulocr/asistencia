@@ -1,12 +1,15 @@
 {
   "name": "asistencia",
   "version": "1.0.0",
-  "description": "",
+  "description": "Este proyecto es una aplicación web profesional diseñada para automatizar la gestión administrativa de los docentes bajo la normativa MEP 2026. Permite el control total de asistencia, evaluaciones de trabajo cotidiano, tareas, exámenes y la generación de reportes consolidados.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +21,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "electron-squirrel-startup": "^1.0.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -25,5 +29,25 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "xlsx": "^0.18.5"
-  }
+  },
+  "main": "index.js",
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
+    "electron": "^40.6.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aangulocr/asistencia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aangulocr/asistencia/issues"
+  },
+  "homepage": "https://github.com/aangulocr/asistencia#readme"
 }
