@@ -27,15 +27,18 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
     const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showManager, setShowManager] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
+    const [allTrabajosTemplates, setAllTrabajosTemplates] = useState<Trabajo[]>([]);
     const { showToast } = useToast();
 
     // Manager state
     const [editNombre, setEditNombre] = useState('');
-    const [editIndicadores, setEditIndicadores] = useState<{ titulo: string, d0: string, d1: string, d2: string, d3: string }[]>([]);
+    const [editIndicadores, setEditIndicadores] = useState<{ id?: string, titulo: string, d0: string, d1: string, d2: string, d3: string }[]>([]);
 
     useEffect(() => {
         fetchInitialData();
+        fetchAllTrabajosTemplates();
     }, []);
 
     useEffect(() => {
@@ -55,9 +58,14 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
     }, [selectedTrabajo]);
 
     async function fetchInitialData() {
-        const { data } = await typedSupabase.from('secciones').select('*').order('nombre'); // Use typedSupabase
+        const { data } = await typedSupabase.from('secciones').select('*').order('nombre');
         setSecciones(data || []);
-        if (data && data.length > 0) setSelectedSeccion(data[0].id); // Removed as any
+        if (data && data.length > 0 && !selectedSeccion) setSelectedSeccion(data[0].id);
+    }
+
+    async function fetchAllTrabajosTemplates() {
+        const { data } = await typedSupabase.from('trabajos_cotidianos').select('*').order('created_at', { ascending: false });
+        setAllTrabajosTemplates(data || []);
     }
 
     async function fetchTrabajos(seccionId: string) {
@@ -163,13 +171,59 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
     // Manager logic
     const handleNewTrabajo = () => {
         setEditNombre('');
-        setEditIndicadores([{ titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+        setEditIndicadores([{ id: undefined, titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+        setIsEditing(false);
         setShowManager(true);
+    };
+
+    const handleEditRubrica = async () => {
+        if (!selectedTrabajo) return;
+        const trabajo = trabajos.find(t => String(t.id) === selectedTrabajo);
+        if (!trabajo) return;
+
+        setEditNombre(trabajo.nombre);
+        const { data: indData } = await typedSupabase.from('indicadores').select('*').eq('trabajo_id', parseInt(selectedTrabajo)).order('orden');
+
+        if (indData) {
+            setEditIndicadores(indData.map(i => ({
+                id: i.id,
+                titulo: i.titulo,
+                d0: i.desc_0 || '',
+                d1: i.desc_1 || '',
+                d2: i.desc_2 || '',
+                d3: i.desc_3 || ''
+            })));
+        }
+        setIsEditing(true);
+        setShowManager(true);
+    };
+
+    const handleLoadTemplate = async (templateId: string) => {
+        if (!templateId) return;
+        setLoading(true);
+        try {
+            const { data: indData } = await typedSupabase.from('indicadores').select('*').eq('trabajo_id', parseInt(templateId)).order('orden');
+            if (indData) {
+                setEditIndicadores(indData.map(i => ({
+                    id: undefined, // Template indicators should NOT have IDs to force new creation
+                    titulo: i.titulo,
+                    d0: i.desc_0 || '',
+                    d1: i.desc_1 || '',
+                    d2: i.desc_2 || '',
+                    d3: i.desc_3 || ''
+                })));
+                showToast('Plantilla cargada', 'success');
+            }
+        } catch (error: any) {
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const addIndicatorField = () => {
         if (editIndicadores.length < 5) {
-            setEditIndicadores([...editIndicadores, { titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+            setEditIndicadores([...editIndicadores, { id: undefined, titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
         }
     };
 
@@ -177,27 +231,71 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
         if (!editNombre) return;
         setLoading(true);
         try {
-            const { data: trabajo, error: tcError } = await typedSupabase.from('trabajos_cotidianos').insert({
-                nombre: editNombre,
-                seccion_id: selectedSeccion,
-                periodo: periodo
-            }).select().single();
+            if (isEditing && selectedTrabajo) {
+                // Update existing work name
+                const { error: tcError } = await typedSupabase.from('trabajos_cotidianos').update({
+                    nombre: editNombre
+                }).eq('id', parseInt(selectedTrabajo));
 
-            if (tcError) throw tcError;
+                if (tcError) throw tcError;
 
-            const indsData: Database['public']['Tables']['indicadores']['Insert'][] = editIndicadores.map((ind, idx) => ({
-                trabajo_id: trabajo!.id,
-                titulo: ind.titulo,
-                orden: idx + 1,
-                desc_0: ind.d0, desc_1: ind.d1, desc_2: ind.d2, desc_3: ind.d3
-            }));
+                // Handle indicators (Update existing, Insert new, Delete removed)
+                const { data: existingInds } = await typedSupabase.from('indicadores').select('id').eq('trabajo_id', parseInt(selectedTrabajo));
+                const existingIds = (existingInds || []).map(i => i.id);
+                const keptIds = editIndicadores.map(i => i.id).filter(id => !!id) as string[];
 
-            const { error: indError } = await typedSupabase.from('indicadores').insert(indsData);
-            if (indError) throw indError;
+                // Delete removed
+                const toDelete = existingIds.filter(id => !keptIds.includes(id));
+                if (toDelete.length > 0) {
+                    await typedSupabase.from('indicadores').delete().in('id', toDelete);
+                }
 
-            showToast('Trabajo Cotidiano creado', 'success');
+                // Upsert remaining/new
+                for (let idx = 0; idx < editIndicadores.length; idx++) {
+                    const ind = editIndicadores[idx];
+                    const data: Database['public']['Tables']['indicadores']['Update'] = {
+                        trabajo_id: parseInt(selectedTrabajo),
+                        titulo: ind.titulo,
+                        orden: idx + 1,
+                        desc_0: ind.d0, desc_1: ind.d1, desc_2: ind.d2, desc_3: ind.d3
+                    };
+
+                    if (ind.id) {
+                        await typedSupabase.from('indicadores').update(data).eq('id', ind.id);
+                    } else {
+                        await typedSupabase.from('indicadores').insert(data as any);
+                    }
+                }
+
+                showToast('Rúbrica actualizada', 'success');
+                fetchIndicadoresAndEvaluations(selectedTrabajo);
+                setShowManager(false);
+                return;
+            } else {
+                // Create new
+                const { data: trabajo, error: tcError } = await typedSupabase.from('trabajos_cotidianos').insert({
+                    nombre: editNombre,
+                    seccion_id: selectedSeccion,
+                    periodo: periodo
+                }).select().single();
+
+                if (tcError) throw tcError;
+
+                const indsData: Database['public']['Tables']['indicadores']['Insert'][] = editIndicadores.map((ind, idx) => ({
+                    trabajo_id: trabajo!.id,
+                    titulo: ind.titulo,
+                    orden: idx + 1,
+                    desc_0: ind.d0, desc_1: ind.d1, desc_2: ind.d2, desc_3: ind.d3
+                }));
+
+                const { error: indError } = await typedSupabase.from('indicadores').insert(indsData);
+                if (indError) throw indError;
+
+                showToast('Trabajo Cotidiano creado', 'success');
+                fetchTrabajos(selectedSeccion);
+                fetchAllTrabajosTemplates();
+            }
             setShowManager(false);
-            fetchTrabajos(selectedSeccion);
         } catch (error: any) {
             showToast(`Error: ${error.message}`, 'error');
         } finally { setLoading(false); }
@@ -244,27 +342,41 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
                             </select>
                         </div>
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button onClick={saveEvaluations} disabled={isSaving || !selectedTrabajo} className="btn-primary">
+                            <button
+                                onClick={saveEvaluations}
+                                disabled={isSaving || !selectedTrabajo}
+                                className="btn-primary"
+                                style={{ background: 'var(--primary)', opacity: selectedTrabajo ? 1 : 0.5 }}
+                            >
                                 {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
                             </button>
                             {selectedTrabajo && (
-                                <button
-                                    onClick={async () => {
-                                        if (confirm('¿Estás seguro de eliminar este trabajo cotidiano y todas sus notas?')) {
-                                            const { error } = await supabase.from('trabajos_cotidianos').delete().eq('id', parseInt(selectedTrabajo));
-                                            if (error) {
-                                                showToast(`Error al eliminar: ${error.message}`, 'error');
-                                            } else {
-                                                showToast('Trabajo eliminado correctamente', 'success');
-                                                fetchTrabajos(selectedSeccion);
+                                <>
+                                    <button
+                                        onClick={handleEditRubrica}
+                                        className="btn-primary"
+                                        style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--glass-border)' }}
+                                    >
+                                        📝 Editar Rúbrica
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm('¿Estás seguro de eliminar este trabajo cotidiano y todas sus notas?')) {
+                                                const { error } = await supabase.from('trabajos_cotidianos').delete().eq('id', parseInt(selectedTrabajo));
+                                                if (error) {
+                                                    showToast(`Error al eliminar: ${error.message}`, 'error');
+                                                } else {
+                                                    showToast('Trabajo eliminado correctamente', 'success');
+                                                    fetchTrabajos(selectedSeccion);
+                                                }
                                             }
-                                        }
-                                    }}
-                                    className="btn-primary"
-                                    style={{ background: 'var(--danger)', opacity: 0.8 }}
-                                >
-                                    🗑️ Eliminar
-                                </button>
+                                        }}
+                                        className="btn-primary"
+                                        style={{ background: 'var(--danger)', opacity: 0.8 }}
+                                    >
+                                        🗑️ Eliminar
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
@@ -360,9 +472,27 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
             ) : (
                 <div className="manager-view glass-card" style={{ padding: '2rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                        <h2>Configurar Rúbrica de Trabajo Cotidiano</h2>
+                        <h2>{isEditing ? 'Editar Rúbrica de Trabajo Cotidiano' : 'Configurar Rúbrica de Trabajo Cotidiano'}</h2>
                         <button onClick={() => setShowManager(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>✕ Cancelar</button>
                     </div>
+
+                    {!isEditing && (
+                        <div style={{ marginBottom: '2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Opcional: Cargar indicadores de otro trabajo</label>
+                            <select
+                                onChange={e => handleLoadTemplate(e.target.value)}
+                                className="glass-card"
+                                style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }}
+                            >
+                                <option value="">-- Seleccionar trabajo como plantilla --</option>
+                                {allTrabajosTemplates.map(t => (
+                                    <option key={t.id} value={t.id} style={{ background: '#1e1b4b' }}>
+                                        {t.nombre} ({new Date(t.created_at || '').toLocaleDateString()})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div style={{ marginBottom: '2rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre del Trabajo (ej. TC1 - Funciones Lógicas)</label>
@@ -421,19 +551,22 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
                             </button>
                         )}
                         <button onClick={createTrabajo} disabled={loading} className="btn-primary">
-                            {loading ? '⌛ Creando...' : '✅ Finalizar y Crear Rúbrica'}
+                            {loading ? '⌛ Guardando...' : (isEditing ? '✅ Guardar Cambios' : '✅ Finalizar y Crear Rúbrica')}
                         </button>
                     </div>
                 </div>
-            )}
+            )
+            }
 
-            {showSummary && selectedSeccion && (
-                <CotidianoSummary
-                    seccionId={selectedSeccion}
-                    periodo={periodo}
-                    onClose={() => setShowSummary(false)}
-                />
-            )}
-        </div>
+            {
+                showSummary && selectedSeccion && (
+                    <CotidianoSummary
+                        seccionId={selectedSeccion}
+                        periodo={periodo}
+                        onClose={() => setShowSummary(false)}
+                    />
+                )
+            }
+        </div >
     );
 };

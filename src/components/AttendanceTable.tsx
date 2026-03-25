@@ -175,12 +175,13 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                 estudiante_id: est.cedula,
                 seccion_id: seccionId,
                 fecha: fecha,
+                periodo: periodo,
                 estado_id: mapLessonsToState(asistencias[est.cedula])
             }));
 
             const { error: attendanceError } = await supabase
                 .from('control_asistencia')
-                .upsert(upsertData as any, { onConflict: 'estudiante_id, fecha' });
+                .upsert(upsertData as any, { onConflict: 'estudiante_id, fecha, periodo' });
 
             if (attendanceError) throw attendanceError;
 

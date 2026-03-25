@@ -1,4 +1,5 @@
 import React from 'react';
+import { supabase } from '../lib/supabase';
 
 interface SidebarProps {
     className?: string;
@@ -106,14 +107,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, currentView, onView
             </nav>
 
 
-            <div className="sidebar-footer">
-                <div className="user-profile">
-                    <div className="user-avatar">👤</div>
-                    <div className="user-info">
-                        <span className="user-name">Profesor</span>
-                        <span className="user-role">Administrador</span>
+            <div className="sidebar-footer" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div className="user-avatar" style={{ fontSize: '2rem' }}>👤</div>
+                    <div className="user-info" style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="user-name" style={{ fontWeight: 600 }}>Usuario Único</span>
+                        <span className="user-role" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Administrador</span>
                     </div>
                 </div>
+                <button 
+                    onClick={async () => await supabase.auth.signOut()} 
+                    className="btn-primary" 
+                    style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem', fontWeight: 600, width: '100%' }}
+                >
+                    🚪 Cerrar Sesión
+                </button>
             </div>
         </aside>
     );

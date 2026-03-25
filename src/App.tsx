@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { SummaryReport } from './components/SummaryReport';
 import { AttendanceSummary } from './components/AttendanceSummary';
 import { ToastProvider } from './components/Toast';
+import { Auth } from './components/Auth';
 
 import { Sidebar } from './components/Sidebar';
 
@@ -31,8 +32,25 @@ function App() {
     const [showReport, setShowReport] = useState(false);
     const [showAttendanceSummary, setShowAttendanceSummary] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [session, setSession] = useState<any>(null);
+    const [isConfiguringPassword, setIsConfiguringPassword] = useState(false);
 
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
 
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            if (_event === 'PASSWORD_RECOVERY') {
+                setIsConfiguringPassword(true);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     useEffect(() => {
         fetchSecciones();
@@ -91,6 +109,39 @@ function App() {
             }
         }
     };
+
+    if (!session) {
+        return (
+            <ToastProvider>
+                <Auth />
+            </ToastProvider>
+        );
+    }
+
+    if (isConfiguringPassword) {
+        return (
+            <ToastProvider>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '2rem' }}>
+                    <div className="glass-card" style={{ padding: '2.5rem', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+                        <h2 style={{ marginBottom: '1rem' }}>🔐 Actualizar Contraseña</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Ingresa tu nueva clave de acceso seguro.</p>
+                        <input type="password" id="new-pwd" placeholder="••••••••" className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', marginBottom: '1rem' }} />
+                        <button onClick={async () => {
+                            const pwd = (document.getElementById('new-pwd') as HTMLInputElement).value;
+                            if (pwd.length < 6) return alert('Debe tener al menos 6 caracteres');
+                            const { error } = await supabase.auth.updateUser({ password: pwd });
+                            if (!error) {
+                                alert("Contraseña actualizada exitosamente.");
+                                setIsConfiguringPassword(false);
+                            } else {
+                                alert("Error: " + error.message);
+                            }
+                        }} className="btn-primary" style={{ width: '100%', padding: '1rem', fontWeight: 600 }}>Guardar Contraseña</button>
+                    </div>
+                </div>
+            </ToastProvider>
+        );
+    }
 
     return (
         <ToastProvider>
