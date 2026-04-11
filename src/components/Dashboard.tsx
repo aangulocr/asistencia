@@ -52,12 +52,12 @@ export function Dashboard({ seccionId, periodo }: Props) {
         const uniqueDates = Array.from(new Set(typedAttendance?.map(a => a.fecha) || []));
         let leccionesProgramadas = 0;
         uniqueDates.forEach(date => {
-            leccionesProgramadas += configMap[date] || 4;
+            leccionesProgramadas += configMap[date] ?? 4;
         });
 
         let sumAbsenceWeights = 0;
         typedAttendance?.forEach((r: any) => {
-            const lessonsToday = configMap[r.fecha] || 4;
+            const lessonsToday = configMap[r.fecha] ?? 4;
             let peso = r.estados_asistencia?.peso_ausencia || 0;
             if (peso > 0) {
                 // Scale weight proportionally to today's lessons

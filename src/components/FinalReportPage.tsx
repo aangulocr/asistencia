@@ -156,12 +156,12 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     const currentConfigs = (configData || []).filter((c: any) => c.periodo === p);
                     const uniqueDatesForPeriod = Array.from(new Set(currentConfigs.map((c: any) => c.fecha)));
                     let totalProgrammedLessonsForPeriod = 0;
-                    uniqueDatesForPeriod.forEach((d: any) => { totalProgrammedLessonsForPeriod += configMap[`${d}-${p}`] || 4; });
+                    uniqueDatesForPeriod.forEach((d: any) => { totalProgrammedLessonsForPeriod += configMap[`${d}-${p}`] ?? 4; });
 
                     let totalWeight = 0;
                     studentAtt.forEach((att: any) => {
                         if (!att.estados_asistencia?.es_justificada) {
-                            const lessonsToday = configMap[`${att.fecha}-${p}`] || 4;
+                            const lessonsToday = configMap[`${att.fecha}-${p}`] ?? 4;
                             let weight = att.estados_asistencia?.peso_ausencia || 0;
                             if (lessonsToday < 4 && weight > 0) {
                                 weight = (weight / 4) * lessonsToday;

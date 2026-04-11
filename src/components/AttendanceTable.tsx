@@ -203,23 +203,27 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                 <div className="glass-card" style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lecciones Impartidas hoy:</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {[1, 2, 3, 4].map(num => (
+                        {[0, 1, 2, 3, 4].map(num => (
                             <button
                                 key={num}
                                 onClick={() => setLeccionesTotales(num)}
+                                title={num === 0 ? "0 Lecciones / Día Libre" : `${num} lecciones`}
                                 style={{
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '6px',
                                     border: 'none',
-                                    background: leccionesTotales === num ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                    background: leccionesTotales === num 
+                                        ? (num === 0 ? 'var(--danger)' : 'var(--primary)') 
+                                        : 'rgba(255,255,255,0.05)',
                                     color: 'white',
                                     cursor: 'pointer',
                                     fontWeight: 'bold',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    opacity: leccionesTotales === num ? 1 : 0.6
                                 }}
                             >
-                                {num}
+                                {num === 0 ? 'Ø' : num}
                             </button>
                         ))}
                     </div>
@@ -273,7 +277,7 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                             <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cédula</th>
                             <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nombre del Estudiante</th>
                             <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estado General</th>
-                            <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>L1</th>
+                            {leccionesTotales >= 1 && <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>L1</th>}
                             {leccionesTotales >= 2 && <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>L2</th>}
                             {leccionesTotales >= 3 && <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>L3</th>}
                             {leccionesTotales >= 4 && <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>L4</th>}
@@ -307,45 +311,59 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
                                         </div>
                                     </td>
                                     <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                        <div
-                                            onClick={() => handleGeneralToggle(est.cedula)}
-                                            style={{
-                                                width: '60px',
-                                                height: '28px',
-                                                background: isPresent ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
-                                                borderRadius: '14px',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                padding: '0 4px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.3s ease',
-                                                position: 'relative'
-                                            }}
-                                        >
+                                        {leccionesTotales === 0 ? (
                                             <div style={{
-                                                width: '20px',
-                                                height: '20px',
-                                                background: 'white',
-                                                borderRadius: '50%',
-                                                transform: isPresent ? 'translateX(32px)' : 'translateX(0)',
-                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '10px'
-                                            }}>{isPresent ? '✓' : ''}</div>
-                                            <span style={{
-                                                position: 'absolute',
-                                                left: isPresent ? '8px' : '26px',
-                                                fontSize: '9px',
-                                                fontWeight: 700,
-                                                color: isPresent ? 'white' : 'var(--danger)',
-                                                pointerEvents: 'none'
+                                                fontSize: '0.75rem',
+                                                color: 'var(--text-muted)',
+                                                fontStyle: 'italic',
+                                                background: 'rgba(255,255,255,0.03)',
+                                                padding: '0.3rem 0.6rem',
+                                                borderRadius: '6px',
+                                                display: 'inline-block'
                                             }}>
-                                                {isPresent ? 'PRES' : 'AUSEN'}
-                                            </span>
-                                        </div>
+                                                Sin clases
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => handleGeneralToggle(est.cedula)}
+                                                style={{
+                                                    width: '60px',
+                                                    height: '28px',
+                                                    background: isPresent ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                                                    borderRadius: '14px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    padding: '0 4px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease',
+                                                    position: 'relative'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    background: 'white',
+                                                    borderRadius: '50%',
+                                                    transform: isPresent ? 'translateX(32px)' : 'translateX(0)',
+                                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '10px'
+                                                }}>{isPresent ? '✓' : ''}</div>
+                                                <span style={{
+                                                    position: 'absolute',
+                                                    left: isPresent ? '8px' : '26px',
+                                                    fontSize: '9px',
+                                                    fontWeight: 700,
+                                                    color: isPresent ? 'white' : 'var(--danger)',
+                                                    pointerEvents: 'none'
+                                                }}>
+                                                    {isPresent ? 'PRES' : 'AUSEN'}
+                                                </span>
+                                            </div>
+                                        )}
                                     </td>
                                     {[0, 1, 2, 3].slice(0, leccionesTotales).map(idx => (
                                         <td key={idx} style={{ padding: '1rem', textAlign: 'center' }}>

@@ -19,6 +19,7 @@ interface StudentReport {
 export function SummaryReport({ seccionId, periodo, onClose }: Props) {
     const [reports, setReports] = useState<StudentReport[]>([]);
     const [loading, setLoading] = useState(true);
+    const [lessonDates, setLessonDates] = useState<{fecha: string, lecciones: number}[]>([]);
 
     useEffect(() => {
         generateReport();
@@ -63,10 +64,18 @@ export function SummaryReport({ seccionId, periodo, onClose }: Props) {
             config.forEach(c => configMap[c.fecha] = c.lecciones_totales);
 
             // Calculate "Global Programmed Lessons" for the section period
-            const uniqueDates = Array.from(new Set(attendance.map(a => a.fecha)));
+            const uniqueDates = Array.from(new Set(attendance.map(a => a.fecha))) as string[];
+            uniqueDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+            
+            const taughtDates = uniqueDates.map(date => ({
+                fecha: date,
+                lecciones: configMap[date] ?? 4
+            }));
+            setLessonDates(taughtDates);
+
             let globalLeccionesProgramadas = 0;
             uniqueDates.forEach(date => {
-                globalLeccionesProgramadas += configMap[date] || 4;
+                globalLeccionesProgramadas += configMap[date] ?? 4;
             });
 
             // 4. Calculate stats per student
@@ -77,7 +86,7 @@ export function SummaryReport({ seccionId, periodo, onClose }: Props) {
                 const datesWithAbsence: string[] = [];
 
                 studentAttendance.forEach((record: any) => {
-                    const lessonsToday = configMap[record.fecha] || 4;
+                    const lessonsToday = configMap[record.fecha] ?? 4;
                     let peso = record.estados_asistencia?.peso_ausencia || 0;
                     if (peso > 0) {
                         // Proportional weight based on lessons today
@@ -190,6 +199,32 @@ export function SummaryReport({ seccionId, periodo, onClose }: Props) {
                         </tbody>
                     </table>
                 </div>
+
+                {lessonDates.length > 0 && (
+                    <div style={{ 
+                        marginTop: '2rem', 
+                        padding: '1rem', 
+                        background: 'rgba(255,255,255,0.02)', 
+                        border: '1px solid var(--glass-border)', 
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted)'
+                    }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)' }}>Lecciones impartidas por fecha</h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {lessonDates.map((item, idx) => (
+                                <div key={idx} style={{ 
+                                    background: 'rgba(0,0,0,0.2)', 
+                                    padding: '0.3rem 0.6rem', 
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(255,255,255,0.05)'
+                                }}>
+                                    <span style={{ fontWeight: 600 }}>{item.fecha}</span>: {item.lecciones} lec.
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
