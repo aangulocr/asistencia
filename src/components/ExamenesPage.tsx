@@ -28,6 +28,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [showManager, setShowManager] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
+    const [allExamenesTemplates, setAllExamenesTemplates] = useState<Examen[]>([]);
     const { showToast } = useToast();
 
     // Manager state
@@ -38,7 +39,13 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
 
     useEffect(() => {
         fetchInitialData();
+        fetchAllExamenesTemplates();
     }, []);
+
+    async function fetchAllExamenesTemplates() {
+        const { data } = await typedSupabase.from('examenes').select('*').order('id', { ascending: false });
+        setAllExamenesTemplates(data || []);
+    }
 
     useEffect(() => {
         if (selectedSeccion) {
@@ -149,6 +156,35 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
         } finally { setIsSaving(false); }
     }
 
+    const handleLoadTemplate = async (templateId: string) => {
+        if (!templateId) return;
+        setLoading(true);
+        try {
+            const template = allExamenesTemplates.find(t => String(t.id) === templateId);
+            if (template) {
+                setEditNombre(template.nombre);
+                setEditPorcentaje(template.porcentaje);
+                setEditPuntosTotales(template.puntos_totales);
+            }
+            
+            const { data: indData } = await typedSupabase.from('indicadores_examen').select('*').eq('examen_id', parseInt(templateId)).order('orden');
+            if (indData) {
+                setEditIndicadores(indData.map(i => ({
+                    titulo: i.titulo,
+                    d0: i.desc_0 || '',
+                    d1: i.desc_1 || '',
+                    d2: i.desc_2 || '',
+                    d3: i.desc_3 || ''
+                })));
+                showToast('Plantilla de examen cargada', 'success');
+            }
+        } catch (error: any) {
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleNewExamen = () => {
         setEditNombre('');
         setEditPorcentaje(25);
@@ -184,6 +220,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
             showToast('Examen configurado correctamente', 'success');
             setShowManager(false);
             fetchExamenes(selectedSeccion);
+            fetchAllExamenesTemplates();
         } catch (error: any) {
             showToast(`Error: ${error.message}`, 'error');
         } finally { setLoading(false); }
@@ -324,6 +361,22 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                         <button onClick={() => setShowManager(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>✕ Cancelar</button>
                     </div>
 
+                    <div style={{ marginBottom: '2rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Opcional: Cargar indicadores y formato de otro examen (Plantilla)</label>
+                        <select
+                            onChange={e => handleLoadTemplate(e.target.value)}
+                            className="glass-card"
+                            style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }}
+                        >
+                            <option value="">-- Seleccionar examen como plantilla --</option>
+                            {allExamenesTemplates.map(t => (
+                                <option key={t.id} value={t.id} style={{ background: '#1e1b4b' }}>
+                                    {t.nombre} ({t.porcentaje}%) - {t.puntos_totales} pts
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre del Examen</label>
@@ -357,7 +410,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                     </div>
 
                     <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-                        {editIndicadores.length < 5 && <button onClick={() => setEditIndicadores([...editIndicadores, { titulo: '', d0: '', d1: '', d2: '', d3: '' }])} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>➕ Añadir Indicador</button>}
+                        {editIndicadores.length < 12 && <button onClick={() => setEditIndicadores([...editIndicadores, { titulo: '', d0: '', d1: '', d2: '', d3: '' }])} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>➕ Añadir Indicador</button>}
                         <button onClick={createExamen} disabled={loading} className="btn-primary">{loading ? '⌛ Guardando...' : '✅ Finalizar Configuración'}</button>
                     </div>
                 </div>
