@@ -33,24 +33,51 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
 
     const mapStateToLessons = (stateId: number): LessonStatus[] => {
         switch (stateId) {
-            case 1: return ['P', 'P', 'P', 'P'];
-            case 2: return ['A', 'A', 'A', 'A'];
-            case 3: return ['A', 'P', 'P', 'P'];
-            case 4: return ['A', 'A', 'P', 'P'];
-            case 5: return ['A', 'A', 'A', 'P'];
-            case 6: return ['T', 'P', 'P', 'P'];
-            case 7: return ['P', 'P', 'T', 'P'];
-            case 8: return ['A', 'T', 'P', 'P'];
-            case 9: return ['A', 'A', 'T', 'P'];
-            case 10: return ['A', 'A', 'A', 'T'];
-            case 11: return ['P', 'A', 'P', 'P'];
-            case 12: return ['J', 'J', 'J', 'J'];
+            // ── Estados originales ──────────────────────────────────
+            case 1:  return ['P', 'P', 'P', 'P'];
+            case 2:  return ['A', 'A', 'A', 'A'];
+            case 3:  return ['A', 'P', 'P', 'P'];  // Ausencia L1
+            case 4:  return ['A', 'A', 'P', 'P'];  // Ausencia L1+L2
+            case 5:  return ['A', 'A', 'A', 'P'];  // Ausencia L1+L2+L3
+            case 6:  return ['T', 'P', 'P', 'P'];  // Tardía L1
+            case 7:  return ['P', 'P', 'T', 'P'];  // Tardía L3
+            case 8:  return ['A', 'T', 'P', 'P'];  // Ausencia L1 + Tardía L2
+            case 9:  return ['A', 'A', 'T', 'P'];  // Ausencia L1+L2 + Tardía L3
+            case 10: return ['A', 'A', 'A', 'T'];  // Ausencia L1+L2+L3 + Tardía L4
+            case 11: return ['P', 'A', 'P', 'P'];  // Escape/Ausencia L2
+            case 12: return ['J', 'J', 'J', 'J'];  // Justificación total
+            // ── Ausencias individuales adicionales ──────────────────
+            case 13: return ['P', 'A', 'P', 'P'];  // Ausencia L2
+            case 14: return ['P', 'P', 'A', 'P'];  // Ausencia L3
+            case 15: return ['P', 'P', 'P', 'A'];  // Ausencia L4
+            case 16: return ['P', 'A', 'A', 'P'];  // Ausencia L2+L3
+            case 17: return ['P', 'P', 'A', 'A'];  // Ausencia L3+L4
+            case 18: return ['P', 'A', 'A', 'A'];  // Ausencia L2+L3+L4
+            case 19: return ['A', 'P', 'A', 'P'];  // Ausencia L1+L3
+            case 20: return ['A', 'P', 'P', 'A'];  // Ausencia L1+L4
+            case 36: return ['P', 'A', 'P', 'A'];  // Ausencia L2+L4
+            // ── Justificaciones parciales ───────────────────────────
+            case 22: return ['J', 'P', 'P', 'P'];  // Justificación L1
+            case 23: return ['P', 'J', 'P', 'P'];  // Justificación L2
+            case 24: return ['P', 'P', 'J', 'P'];  // Justificación L3
+            case 25: return ['P', 'P', 'P', 'J'];  // Justificación L4
+            case 26: return ['J', 'J', 'P', 'P'];  // Justificación L1+L2
+            case 27: return ['P', 'J', 'J', 'P'];  // Justificación L2+L3
+            case 28: return ['P', 'P', 'J', 'J'];  // Justificación L3+L4
+            case 29: return ['J', 'J', 'J', 'P'];  // Justificación L1+L2+L3
+            case 30: return ['P', 'J', 'J', 'J'];  // Justificación L2+L3+L4
+            case 31: return ['J', 'P', 'J', 'P'];  // Justificación L1+L3
+            case 32: return ['J', 'P', 'P', 'J'];  // Justificación L1+L4
+            case 33: return ['P', 'J', 'P', 'J'];  // Justificación L2+L4
+            case 34: return ['J', 'J', 'P', 'J'];  // Justificación L1+L2+L4
+            case 35: return ['J', 'P', 'J', 'J'];  // Justificación L1+L3+L4
             default: return ['P', 'P', 'P', 'P'];
         }
     };
 
     const mapLessonsToState = (lessons: LessonStatus[]): number => {
         const s = lessons.join('');
+        // ── Estados originales ────────────────────────────────────
         if (s === 'PPPP') return 1;
         if (s === 'AAAA') return 2;
         if (s === 'APPP') return 3;
@@ -61,9 +88,33 @@ export function AttendanceTable({ seccionId, fecha, periodo, onSave }: Props) {
         if (s === 'ATPP') return 8;
         if (s === 'AATP') return 9;
         if (s === 'AAAT') return 10;
+        if (s === 'PAPP') return 11; // Escape L2 (estado original)
         if (s === 'JJJJ') return 12;
-        if (lessons.some(l => l === 'A')) return 11;
-        if (lessons.some(l => l === 'J')) return 12;
+        // ── Ausencias individuales adicionales ────────────────────
+        if (s === 'PPAP') return 14; // Ausencia L3
+        if (s === 'PPPA') return 15; // Ausencia L4
+        if (s === 'PAAP') return 16; // Ausencia L2+L3
+        if (s === 'PPAA') return 17; // Ausencia L3+L4
+        if (s === 'PAAA') return 18; // Ausencia L2+L3+L4
+        if (s === 'APAP') return 19; // Ausencia L1+L3
+        if (s === 'APPA') return 20; // Ausencia L1+L4
+        if (s === 'PAPA') return 36; // Ausencia L2+L4
+        // ── Justificaciones parciales ─────────────────────────────
+        if (s === 'JPPP') return 22;
+        if (s === 'PJPP') return 23;
+        if (s === 'PPJP') return 24;
+        if (s === 'PPPJ') return 25;
+        if (s === 'JJPP') return 26;
+        if (s === 'PJJP') return 27;
+        if (s === 'PPJJ') return 28;
+        if (s === 'JJJP') return 29;
+        if (s === 'PJJJ') return 30;
+        if (s === 'JPJP') return 31;
+        if (s === 'JPPJ') return 32;
+        if (s === 'PJPJ') return 33;
+        if (s === 'JJPJ') return 34;
+        if (s === 'JPJJ') return 35;
+        // ── Fallback seguro ───────────────────────────────────────
         return 1;
     };
 
