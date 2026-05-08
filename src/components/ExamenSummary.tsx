@@ -54,22 +54,36 @@ export const ExamenSummary: React.FC<ExamenSummaryProps> = ({ seccionId, periodo
                 const { data: evalData } = await typedSupabase.from('evaluaciones_examen').select('*').in('indicador_id', indicators.map(i => i.id));
                 const evaluations = evalData || [];
 
+                // Direct notes
+                const { data: directData } = await (typedSupabase as any).from('notas_directas_examen').select('*').in('examen_id', exIds);
+                const directNotes = directData || [];
+
                 // Calculate grades
                 const newGradesMap: Record<string, Record<number, { nota: number, obtenido: number }>> = {};
                 students.forEach(est => {
                     newGradesMap[est.cedula] = {};
                     exams.forEach(ex => {
-                        const exInds = indicators.filter(i => i.examen_id === ex.id);
-                        const studentEvals = evaluations.filter(ev =>
-                            ev.estudiante_id === est.cedula &&
-                            exInds.some(i => i.id === ev.indicador_id)
-                        );
+                        const directNoteRecord = directNotes.find((dn: any) => dn.estudiante_id === est.cedula && dn.examen_id === ex.id);
 
-                        let pointsPaid = 0;
-                        studentEvals.forEach(ev => { pointsPaid += ev.puntaje || 0; });
+                        let nota = 0;
+                        let obtenido = 0;
 
-                        const nota = Math.round((pointsPaid / ex.puntos_totales) * 100) || 0;
-                        const obtenido = Number(((nota / 100) * ex.porcentaje).toFixed(2));
+                        if (directNoteRecord) {
+                            nota = Number(directNoteRecord.nota);
+                            obtenido = Number(((nota / 100) * ex.porcentaje).toFixed(2));
+                        } else {
+                            const exInds = indicators.filter(i => i.examen_id === ex.id);
+                            const studentEvals = evaluations.filter(ev =>
+                                ev.estudiante_id === est.cedula &&
+                                exInds.some(i => i.id === ev.indicador_id)
+                            );
+
+                            let pointsPaid = 0;
+                            studentEvals.forEach(ev => { pointsPaid += ev.puntaje || 0; });
+
+                            nota = Math.round((pointsPaid / ex.puntos_totales) * 100) || 0;
+                            obtenido = Number(((nota / 100) * ex.porcentaje).toFixed(2));
+                        }
 
                         newGradesMap[est.cedula][ex.id] = { nota, obtenido };
                     });

@@ -24,6 +24,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
     const [indicadores, setIndicadores] = useState<IndicadorExamen[]>([]);
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
     const [evaluaciones, setEvaluaciones] = useState<Record<string, Record<string, number>>>({});
+    const [notasDirectas, setNotasDirectas] = useState<Record<string, number | ''>>({});
     const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showManager, setShowManager] = useState(false);
@@ -60,6 +61,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
         } else {
             setIndicadores([]);
             setEvaluaciones({});
+            setNotasDirectas({});
         }
     }, [selectedExamen]);
 
@@ -95,6 +97,14 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
             evalMap[ev.estudiante_id][ev.indicador_id] = ev.puntaje || 0;
         });
         setEvaluaciones(evalMap);
+
+        const { data: directData } = await typedSupabase.from('notas_directas_examen' as any).select('*').eq('examen_id', parseInt(examenId));
+        const ndMap: Record<string, number> = {};
+        (directData || []).forEach(nd => {
+            ndMap[nd.estudiante_id] = nd.nota;
+        });
+        setNotasDirectas(ndMap);
+
         setLoading(false);
     }
 
@@ -117,11 +127,19 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
             indicadores.forEach(ind => { updatedStudentEvals[ind.id] = newScore; });
             return { ...prev, [estudianteId]: updatedStudentEvals };
         });
+        setNotasDirectas(prev => ({ ...prev, [estudianteId]: '' }));
     };
 
     const calculateGrades = (estudianteId: string) => {
         const currentExamen = examenes.find(e => String(e.id) === selectedExamen);
         if (!currentExamen || indicadores.length === 0) return { nota: 0, obtenido: 0 };
+
+        const directGrade = notasDirectas[estudianteId];
+        if (directGrade !== undefined && directGrade !== '') {
+            const nota = Number(directGrade);
+            const obtenido = Number(((nota / 100) * currentExamen.porcentaje).toFixed(2));
+            return { nota, obtenido };
+        }
 
         const studentEvals = evaluaciones[estudianteId] || {};
         let points = 0;
@@ -137,19 +155,48 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
         setIsSaving(true);
         try {
             const upsertData: Database['public']['Tables']['evaluaciones_examen']['Insert'][] = [];
+            const directNotesUpsert: any[] = [];
+            const directNotesDelete: string[] = [];
+
             estudiantes.forEach(est => {
-                const estEvals = evaluaciones[est.cedula] || {};
-                indicadores.forEach(ind => {
-                    if (estEvals[ind.id] !== undefined) {
-                        upsertData.push({ estudiante_id: est.cedula, indicador_id: ind.id, puntaje: estEvals[ind.id] });
-                    }
-                });
+                const directGrade = notasDirectas[est.cedula];
+                if (directGrade !== undefined && directGrade !== '') {
+                    // Has direct note
+                    directNotesUpsert.push({
+                        examen_id: parseInt(selectedExamen),
+                        estudiante_id: est.cedula,
+                        nota: Number(directGrade)
+                    });
+                } else {
+                    // Has indicators
+                    directNotesDelete.push(est.cedula);
+                    const estEvals = evaluaciones[est.cedula] || {};
+                    indicadores.forEach(ind => {
+                        if (estEvals[ind.id] !== undefined) {
+                            upsertData.push({ estudiante_id: est.cedula, indicador_id: ind.id, puntaje: estEvals[ind.id] });
+                        }
+                    });
+                }
             });
 
             if (upsertData.length > 0) {
                 const { error } = await typedSupabase.from('evaluaciones_examen').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
                 if (error) throw error;
             }
+
+            if (directNotesUpsert.length > 0) {
+                const { error } = await (typedSupabase as any).from('notas_directas_examen').upsert(directNotesUpsert, { onConflict: 'examen_id, estudiante_id' });
+                if (error) throw error;
+            }
+
+            if (directNotesDelete.length > 0) {
+                const { error } = await (typedSupabase as any).from('notas_directas_examen')
+                    .delete()
+                    .eq('examen_id', parseInt(selectedExamen))
+                    .in('estudiante_id', directNotesDelete);
+                if (error) throw error;
+            }
+
             showToast('Evaluaciones de examen guardadas', 'success');
         } catch (error: any) {
             showToast(`Error: ${error.message}`, 'error');
@@ -308,16 +355,17 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)' }}>
-                                        <th style={{ textAlign: 'left', padding: '1rem 1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estudiante</th>
-                                        <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>MIN/MAX</th>
+                                        <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)', position: 'sticky', left: 0, background: '#1e1b4b', zIndex: 10 }}>Estudiante</th>
+                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>MIN/MAX</th>
                                         {indicadores.map((ind, idx) => (
-                                            <th key={ind.id} style={{ textAlign: 'center', padding: '1rem', fontSize: '0.7rem', maxWidth: '120px' }} title={ind.titulo}>
+                                            <th key={ind.id} style={{ textAlign: 'center', padding: '0.75rem 0.2rem', fontSize: '0.7rem', maxWidth: '60px' }} title={ind.titulo}>
                                                 I{idx + 1}
                                                 <div style={{ fontSize: '0.6rem', fontWeight: 400, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ind.titulo}</div>
                                             </th>
                                         ))}
-                                        <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>NOTA</th>
-                                        <th style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>VALOR</th>
+                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>NOTA DIRECTA</th>
+                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>NOTA FINAL</th>
+                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>VALOR</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -328,24 +376,93 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
 
                                         return (
                                             <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem' }}>{est.apellidos}, {est.nombre}</td>
-                                                <td style={{ textAlign: 'center' }}>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', position: 'sticky', left: 0, background: '#1e1b4b', zIndex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    {est.apellidos}, {est.nombre}
+                                                </td>
+                                                <td style={{ textAlign: 'center', padding: '0.5rem' }}>
                                                     <button onClick={() => handleToggleAllScores(est.cedula)} style={{ fontSize: '9px', padding: '4px 8px', borderRadius: '8px', background: allAreThree ? 'var(--danger)' : 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>{allAreThree ? 'MIN' : 'MAX'}</button>
                                                 </td>
                                                 {indicadores.map(ind => {
-                                                    const score = evaluaciones[est.cedula]?.[ind.id] ?? null;
+                                                    const score = evaluaciones[est.cedula]?.[ind.id];
+                                                    const displayScore = score !== undefined ? score : '';
                                                     return (
-                                                        <td key={ind.id} style={{ textAlign: 'center', padding: '0.5rem' }}>
-                                                            <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
-                                                                {[0, 1, 2, 3].map(level => (
-                                                                    <button key={level} onClick={() => handleScoreClick(est.cedula, ind.id, level)} title={level === 0 ? (ind.desc_0 ?? '') : level === 1 ? (ind.desc_1 ?? '') : level === 2 ? (ind.desc_2 ?? '') : (ind.desc_3 ?? '')} style={{ width: '24px', height: '24px', borderRadius: '4px', border: 'none', background: score === level ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: 'white', fontSize: '10px', cursor: 'pointer' }}>{level}</button>
-                                                                ))}
-                                                            </div>
+                                                        <td key={ind.id} style={{ textAlign: 'center', padding: '0.2rem' }}>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="3"
+                                                                value={displayScore}
+                                                                title={ind.titulo}
+                                                                placeholder="0-3"
+                                                                onChange={(e) => {
+                                                                    if (e.target.value === '') {
+                                                                        setEvaluaciones(prev => {
+                                                                            const updated = { ...prev };
+                                                                            if (updated[est.cedula]) {
+                                                                                const student = { ...updated[est.cedula] };
+                                                                                delete student[ind.id];
+                                                                                updated[est.cedula] = student;
+                                                                            }
+                                                                            return updated;
+                                                                        });
+                                                                    } else {
+                                                                        let val = parseInt(e.target.value);
+                                                                        if (isNaN(val)) val = 0;
+                                                                        if (val > 3) val = 3;
+                                                                        if (val < 0) val = 0;
+                                                                        handleScoreClick(est.cedula, ind.id, val);
+                                                                    }
+                                                                    setNotasDirectas(prev => ({ ...prev, [est.cedula]: '' }));
+                                                                }}
+                                                                style={{
+                                                                    width: '45px',
+                                                                    height: '30px',
+                                                                    textAlign: 'center',
+                                                                    borderRadius: '4px',
+                                                                    border: '1px solid rgba(255,255,255,0.2)',
+                                                                    background: displayScore !== '' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                                                    color: 'white',
+                                                                    fontSize: '12px'
+                                                                }}
+                                                            />
                                                         </td>
                                                     );
                                                 })}
-                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)' }}>{nota}%</td>
-                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)' }}>{obtenido}%</td>
+                                                <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={notasDirectas[est.cedula] ?? ''}
+                                                        placeholder="Ej: 85"
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setNotasDirectas(prev => ({ ...prev, [est.cedula]: val === '' ? '' : Number(val) }));
+                                                            // Si digita nota directa, resetea los indicadores visualmente a vacío o 0
+                                                            if (val !== '') {
+                                                                setEvaluaciones(prev => {
+                                                                    const updated = { ...prev };
+                                                                    if (updated[est.cedula]) {
+                                                                        updated[est.cedula] = {};
+                                                                    }
+                                                                    return updated;
+                                                                });
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '50px',
+                                                            height: '30px',
+                                                            textAlign: 'center',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid var(--primary)',
+                                                            background: 'rgba(255,255,255,0.05)',
+                                                            color: 'white',
+                                                            fontSize: '12px'
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', padding: '0.5rem' }}>{nota}%</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', padding: '0.5rem' }}>{obtenido}%</td>
                                             </tr>
                                         );
                                     })}
