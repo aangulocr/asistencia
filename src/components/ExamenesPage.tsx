@@ -98,9 +98,9 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
         });
         setEvaluaciones(evalMap);
 
-        const { data: directData } = await typedSupabase.from('notas_directas_examen' as any).select('*').eq('examen_id', parseInt(examenId));
+        const { data: directData } = await (typedSupabase as any).from('notas_directas_examen').select('*').eq('examen_id', parseInt(examenId));
         const ndMap: Record<string, number> = {};
-        (directData || []).forEach(nd => {
+        (directData as any[] || []).forEach(nd => {
             ndMap[nd.estudiante_id] = nd.nota;
         });
         setNotasDirectas(ndMap);
@@ -116,6 +116,59 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                 [indicadorId]: score
             }
         }));
+        // Limpiar nota directa si se edita un indicador
+        setNotasDirectas(prev => {
+            const updated = { ...prev };
+            delete updated[estudianteId];
+            return updated;
+        });
+    };
+
+    const handleScoreChange = (estudianteId: string, indicadorId: number, value: string) => {
+        if (value === '') {
+            setEvaluaciones(prev => {
+                const updated = { ...prev };
+                if (updated[estudianteId]) {
+                    const student = { ...updated[estudianteId] };
+                    delete student[indicadorId];
+                    updated[estudianteId] = student;
+                }
+                return updated;
+            });
+        } else {
+            let val = parseInt(value);
+            if (isNaN(val)) val = 0;
+            if (val > 3) val = 3;
+            if (val < 0) val = 0;
+            handleScoreClick(estudianteId, String(indicadorId), val);
+        }
+    };
+
+    const handleNotaFinalDirecta = (estudianteId: string, value: string) => {
+        if (value === '') {
+            setNotasDirectas(prev => {
+                const updated = { ...prev };
+                delete updated[estudianteId];
+                return updated;
+            });
+            return;
+        }
+        let num = Number(value);
+        if (isNaN(num)) return;
+        if (num > 100) num = 100;
+        if (num < 0) num = 0;
+        setNotasDirectas(prev => ({ ...prev, [estudianteId]: num }));
+        
+        // Set all indicators to 0
+        setEvaluaciones(prev => {
+            const updated = { ...prev };
+            const zeroed: Record<string, number> = {};
+            indicadores.forEach(ind => {
+                zeroed[ind.id] = 0;
+            });
+            updated[estudianteId] = zeroed;
+            return updated;
+        });
     };
 
     const handleToggleAllScores = (estudianteId: string) => {
@@ -127,7 +180,12 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
             indicadores.forEach(ind => { updatedStudentEvals[ind.id] = newScore; });
             return { ...prev, [estudianteId]: updatedStudentEvals };
         });
-        setNotasDirectas(prev => ({ ...prev, [estudianteId]: '' }));
+        // Limpiar nota directa si se usa MAX/MIN
+        setNotasDirectas(prev => {
+            const updated = { ...prev };
+            delete updated[estudianteId];
+            return updated;
+        });
     };
 
     const calculateGrades = (estudianteId: string) => {
@@ -300,7 +358,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
 
             {!showManager ? (
                 <div className="evaluation-view">
-                    <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="glass-card" style={{ padding: '2rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <label style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--primary)' }}>CALIFICAR:</label>
@@ -309,7 +367,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                                     onChange={e => setSelectedExamen(e.target.value)}
                                     className="glass-card"
                                     style={{
-                                        padding: '0.6rem 1.5rem',
+                                        padding: '0.8rem 1.5rem',
                                         background: 'rgba(255,255,255,0.1)',
                                         color: 'white',
                                         border: '1px solid var(--primary)',
@@ -323,14 +381,14 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                                 </select>
                             </div>
                             {selectedExamen && (
-                                <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
-                                    <div style={{ color: 'var(--primary)' }}><strong>Puntos Totales:</strong> {examenes.find(e => String(e.id) === selectedExamen)?.puntos_totales}</div>
-                                    <div style={{ color: 'var(--primary)' }}><strong>Valor:</strong> {examenes.find(e => String(e.id) === selectedExamen)?.porcentaje}%</div>
+                                <div style={{ display: 'flex', gap: '1.5rem', fontSize: '1rem' }}>
+                                    <div style={{ color: 'var(--primary)', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '8px' }}><strong>Puntos Totales:</strong> {examenes.find(e => String(e.id) === selectedExamen)?.puntos_totales}</div>
+                                    <div style={{ color: 'var(--primary)', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '8px' }}><strong>Valor:</strong> {examenes.find(e => String(e.id) === selectedExamen)?.porcentaje}%</div>
                                 </div>
                             )}
                         </div>
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button onClick={saveEvaluations} disabled={isSaving || !selectedExamen} className="btn-primary">
+                            <button onClick={saveEvaluations} disabled={isSaving || !selectedExamen} className="btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1.1rem', fontWeight: 'bold' }}>
                                 {isSaving ? '⌛ Guardando...' : '💾 Guardar Notas'}
                             </button>
                             {selectedExamen && (
@@ -342,7 +400,7 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                                         }
                                     }}
                                     className="btn-primary"
-                                    style={{ background: 'var(--danger)', opacity: 0.8 }}
+                                    style={{ background: 'var(--danger)', opacity: 0.8, padding: '0.8rem 1.5rem', fontSize: '1rem' }}
                                 >
                                     🗑️ Eliminar
                                 </button>
@@ -355,17 +413,17 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)', position: 'sticky', left: 0, background: '#1e1b4b', zIndex: 10 }}>Estudiante</th>
-                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>MIN/MAX</th>
+                                        <th style={{ textAlign: 'left', padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)', position: 'sticky', left: 0, zIndex: 10, background: '#111827', minWidth: '200px' }}>Estudiante</th>
+                                        <th style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>M/M</th>
                                         {indicadores.map((ind, idx) => (
-                                            <th key={ind.id} style={{ textAlign: 'center', padding: '0.75rem 0.2rem', fontSize: '0.7rem', maxWidth: '60px' }} title={ind.titulo}>
+                                            <th key={ind.id} style={{ textAlign: 'center', padding: '0.5rem 0.2rem', fontSize: '0.7rem', width: '45px', minWidth: '45px', maxWidth: '45px' }} title={ind.titulo}>
                                                 I{idx + 1}
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 400, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ind.titulo}</div>
+                                                <div style={{ fontSize: '0.55rem', fontWeight: 400, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '40px' }}>{ind.titulo}</div>
                                             </th>
                                         ))}
-                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>NOTA DIRECTA</th>
-                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>NOTA FINAL</th>
-                                        <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>VALOR</th>
+                                        <th style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.7rem', color: '#facc15', fontWeight: 700 }}>NOTA FINAL</th>
+                                        <th style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>CALIF.</th>
+                                        <th style={{ textAlign: 'center', padding: '0.5rem', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>%</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -373,96 +431,68 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                                         const { nota, obtenido } = calculateGrades(est.cedula);
                                         const studentEvals = evaluaciones[est.cedula] || {};
                                         const allAreThree = indicadores.length > 0 && indicadores.every(ind => studentEvals[ind.id] === 3);
-
+                                        const notaDirecta = notasDirectas[est.cedula] ?? '';
+                                        const tieneNotaDirecta = notaDirecta !== '';
+                                        
                                         return (
-                                            <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', position: 'sticky', left: 0, background: '#1e1b4b', zIndex: 1, borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                                                    {est.apellidos}, {est.nombre}
-                                                </td>
-                                                <td style={{ textAlign: 'center', padding: '0.5rem' }}>
-                                                    <button onClick={() => handleToggleAllScores(est.cedula)} style={{ fontSize: '9px', padding: '4px 8px', borderRadius: '8px', background: allAreThree ? 'var(--danger)' : 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>{allAreThree ? 'MIN' : 'MAX'}</button>
+                                            <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: tieneNotaDirecta ? 'rgba(250,204,21,0.03)' : 'transparent' }}>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', position: 'sticky', left: 0, zIndex: 5, background: tieneNotaDirecta ? '#1a180e' : '#111827', whiteSpace: 'nowrap', borderRight: '1px solid rgba(255,255,255,0.05)' }}>{est.apellidos}, {est.nombre}</td>
+                                                <td style={{ textAlign: 'center', padding: '0.25rem' }}>
+                                                    <button onClick={() => handleToggleAllScores(est.cedula)} style={{ fontSize: '8px', padding: '4px 6px', borderRadius: '6px', background: allAreThree ? 'var(--danger)' : 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>{allAreThree ? 'MIN' : 'MAX'}</button>
                                                 </td>
                                                 {indicadores.map(ind => {
-                                                    const score = evaluaciones[est.cedula]?.[ind.id];
+                                                    const score = evaluaciones[est.cedula]?.[String(ind.id)];
                                                     const displayScore = score !== undefined ? score : '';
                                                     return (
-                                                        <td key={ind.id} style={{ textAlign: 'center', padding: '0.2rem' }}>
+                                                        <td key={ind.id} style={{ textAlign: 'center', padding: '0.25rem' }}>
                                                             <input
                                                                 type="number"
-                                                                min="0"
-                                                                max="3"
+                                                                min={0}
+                                                                max={3}
                                                                 value={displayScore}
-                                                                title={ind.titulo}
-                                                                placeholder="0-3"
-                                                                onChange={(e) => {
-                                                                    if (e.target.value === '') {
-                                                                        setEvaluaciones(prev => {
-                                                                            const updated = { ...prev };
-                                                                            if (updated[est.cedula]) {
-                                                                                const student = { ...updated[est.cedula] };
-                                                                                delete student[ind.id];
-                                                                                updated[est.cedula] = student;
-                                                                            }
-                                                                            return updated;
-                                                                        });
-                                                                    } else {
-                                                                        let val = parseInt(e.target.value);
-                                                                        if (isNaN(val)) val = 0;
-                                                                        if (val > 3) val = 3;
-                                                                        if (val < 0) val = 0;
-                                                                        handleScoreClick(est.cedula, ind.id, val);
-                                                                    }
-                                                                    setNotasDirectas(prev => ({ ...prev, [est.cedula]: '' }));
-                                                                }}
+                                                                onChange={e => handleScoreChange(est.cedula, ind.id, e.target.value)}
+                                                                title={`${ind.titulo} (0-3)`}
                                                                 style={{
-                                                                    width: '45px',
-                                                                    height: '30px',
+                                                                    width: '38px',
                                                                     textAlign: 'center',
-                                                                    borderRadius: '4px',
-                                                                    border: '1px solid rgba(255,255,255,0.2)',
-                                                                    background: displayScore !== '' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                                                    background: 'rgba(255,255,255,0.07)',
+                                                                    border: '1px solid rgba(99,102,241,0.3)',
+                                                                    borderRadius: '6px',
                                                                     color: 'white',
-                                                                    fontSize: '12px'
+                                                                    fontSize: '0.85rem',
+                                                                    fontWeight: 700,
+                                                                    padding: '4px 0',
+                                                                    outline: 'none'
                                                                 }}
                                                             />
                                                         </td>
                                                     );
                                                 })}
-                                                <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                                <td style={{ textAlign: 'center', padding: '0.25rem' }}>
                                                     <input
                                                         type="number"
-                                                        min="0"
-                                                        max="100"
+                                                        min={0}
+                                                        max={100}
+                                                        placeholder="—"
                                                         value={notasDirectas[est.cedula] ?? ''}
-                                                        placeholder="Ej: 85"
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            setNotasDirectas(prev => ({ ...prev, [est.cedula]: val === '' ? '' : Number(val) }));
-                                                            // Si digita nota directa, resetea los indicadores visualmente a vacío o 0
-                                                            if (val !== '') {
-                                                                setEvaluaciones(prev => {
-                                                                    const updated = { ...prev };
-                                                                    if (updated[est.cedula]) {
-                                                                        updated[est.cedula] = {};
-                                                                    }
-                                                                    return updated;
-                                                                });
-                                                            }
-                                                        }}
+                                                        onChange={e => handleNotaFinalDirecta(est.cedula, e.target.value)}
+                                                        title="Nota Final Directa (sobreescribe rúbrica)"
                                                         style={{
-                                                            width: '50px',
-                                                            height: '30px',
+                                                            width: '46px',
                                                             textAlign: 'center',
-                                                            borderRadius: '4px',
-                                                            border: '1px solid var(--primary)',
-                                                            background: 'rgba(255,255,255,0.05)',
-                                                            color: 'white',
-                                                            fontSize: '12px'
+                                                            background: tieneNotaDirecta ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.05)',
+                                                            border: `1px solid ${tieneNotaDirecta ? '#facc15' : 'rgba(255,255,255,0.1)'}`,
+                                                            borderRadius: '6px',
+                                                            color: tieneNotaDirecta ? '#facc15' : 'var(--text-muted)',
+                                                            fontSize: '0.85rem',
+                                                            fontWeight: 700,
+                                                            padding: '4px 0',
+                                                            outline: 'none'
                                                         }}
                                                     />
                                                 </td>
-                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', padding: '0.5rem' }}>{nota}%</td>
-                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', padding: '0.5rem' }}>{obtenido}%</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', fontSize: '0.85rem' }}>{obtenido}%</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 700, color: nota >= 70 ? 'var(--primary)' : 'var(--danger)', fontSize: '0.85rem' }}>{nota}%</td>
                                             </tr>
                                         );
                                     })}
@@ -494,18 +524,27 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                         </select>
                     </div>
 
-                    <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre del Examen</label>
-                            <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} placeholder="Ej: Primer Examen Trimestral" />
+                            <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontSize: '1.1rem' }} placeholder="Ej: Primer Examen Trimestral" />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Valor Porcentual (%)</label>
-                            <input type="number" step="0.5" value={editPorcentaje} onChange={e => setEditPorcentaje(parseFloat(e.target.value))} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} />
+                            <input type="number" step="0.5" value={editPorcentaje} onChange={e => {
+                                let val = parseFloat(e.target.value);
+                                if (val > 100) val = 100;
+                                if (val < 0) val = 0;
+                                setEditPorcentaje(val);
+                            }} className="glass-card" style={{ width: '100%', padding: '1rem', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: 'white', border: '2px solid var(--primary)' }} />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Puntos Totales</label>
-                            <input type="number" value={editPuntosTotales} onChange={e => setEditPuntosTotales(parseInt(e.target.value))} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} />
+                            <input type="number" value={editPuntosTotales} onChange={e => {
+                                let val = parseInt(e.target.value);
+                                if (val < 1) val = 1;
+                                setEditPuntosTotales(val);
+                            }} className="glass-card" style={{ width: '100%', padding: '1rem', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: 'white', border: '2px solid var(--primary)' }} />
                         </div>
                     </div>
 
