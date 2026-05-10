@@ -132,7 +132,7 @@ export const TrabajoCotidianoPage: React.FC<Props> = ({ periodo }) => {
         });
     };
 
-    const handleScoreChange = (estudianteId: string, indicadorId: number, value: string) => {
+    const handleScoreChange = (estudianteId: string, indicadorId: string | number, value: string) => {
         if (value === '') {
             setEvaluaciones(prev => {
                 const updated = { ...prev };
