@@ -101,6 +101,11 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
             const exIndIds = (exIndData || []).map(i => i.id);
             const { data: exEvalData } = await typedSupabase.from('evaluaciones_examen').select('*').in('indicador_id', exIndIds) as { data: EvaluacionExamen[] | null };
 
+            // Fetch Direct Notes
+            const { data: directTCData } = await (typedSupabase as any).from('notas_directas_cotidiano').select('*').in('trabajo_id', tcIds);
+            const { data: directTarData } = await (typedSupabase as any).from('notas_directas_tarea').select('*').in('tarea_id', tarIds);
+            const { data: directExData } = await (typedSupabase as any).from('notas_directas_examen').select('*').in('examen_id', exIds);
+
             const configMap: Record<string, number> = {};
             (configData || []).forEach(c => { configMap[`${c.fecha}-${c.periodo}`] = c.lecciones_totales; });
 
@@ -115,12 +120,18 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     if (currentTCIds.length > 0) {
                         let sumOfPercentages = 0;
                         currentTCIds.forEach((tcId: number) => {
-                            const tcIndsForThis = (tcIndData || []).filter((i: any) => i.trabajo_id === tcId).map((i: any) => i.id);
-                            if (tcIndsForThis.length > 0) {
-                                const studentEvals = (tcEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && tcIndsForThis.includes(ev.indicador_id));
-                                const points = studentEvals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                                const max = tcIndsForThis.length * 3;
-                                sumOfPercentages += (points / max) * 100;
+                            // Check for direct grade
+                            const directNote = (directTCData || []).find((dn: any) => dn.estudiante_id === est.cedula && dn.trabajo_id === tcId);
+                            if (directNote) {
+                                sumOfPercentages += Number(directNote.nota);
+                            } else {
+                                const tcIndsForThis = (tcIndData || []).filter((i: any) => i.trabajo_id === tcId).map((i: any) => i.id);
+                                if (tcIndsForThis.length > 0) {
+                                    const studentEvals = (tcEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && tcIndsForThis.includes(ev.indicador_id));
+                                    const points = studentEvals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                                    const max = tcIndsForThis.length * 3;
+                                    sumOfPercentages += (points / max) * 100;
+                                }
                             }
                         });
                         tcAverage = (sumOfPercentages / currentTCIds.length) || 0;
@@ -132,10 +143,16 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     const currentTareas = (tarData || []).filter((t: any) => t.periodo === p);
                     if (currentTareas.length > 0) {
                         currentTareas.forEach((tar: any) => {
-                            const inds = (tarIndData || []).filter((i: any) => i.tarea_id === tar.id).map((i: any) => i.id);
-                            const evals = (tarEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
-                            const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                            tarObtained += (points / tar.puntos_totales) * tar.porcentaje;
+                            // Check for direct grade
+                            const directNote = (directTarData || []).find((dn: any) => dn.estudiante_id === est.cedula && dn.tarea_id === tar.id);
+                            if (directNote) {
+                                tarObtained += (Number(directNote.nota) / 100) * tar.porcentaje;
+                            } else {
+                                const inds = (tarIndData || []).filter((i: any) => i.tarea_id === tar.id).map((i: any) => i.id);
+                                const evals = (tarEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
+                                const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                                tarObtained += (points / tar.puntos_totales) * tar.porcentaje;
+                            }
                         });
                     }
 
@@ -144,10 +161,16 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     const currentExams = (exData || []).filter((e: any) => e.periodo === p);
                     if (currentExams.length > 0) {
                         currentExams.forEach((ex: any) => {
-                            const inds = (exIndData || []).filter((i: any) => i.examen_id === ex.id).map((i: any) => i.id);
-                            const evals = (exEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
-                            const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                            exObtained += (points / ex.puntos_totales) * ex.porcentaje;
+                            // Check for direct grade
+                            const directNote = (directExData || []).find((dn: any) => dn.estudiante_id === est.cedula && dn.examen_id === ex.id);
+                            if (directNote) {
+                                exObtained += (Number(directNote.nota) / 100) * ex.porcentaje;
+                            } else {
+                                const inds = (exIndData || []).filter((i: any) => i.examen_id === ex.id).map((i: any) => i.id);
+                                const evals = (exEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
+                                const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
+                                exObtained += (points / ex.puntos_totales) * ex.porcentaje;
+                            }
                         });
                     }
 

@@ -63,23 +63,26 @@ export const ExamenSummary: React.FC<ExamenSummaryProps> = ({ seccionId, periodo
                 students.forEach(est => {
                     newGradesMap[est.cedula] = {};
                     exams.forEach(ex => {
-                        const directNoteRecord = directNotes.find((dn: any) => dn.estudiante_id === est.cedula && dn.examen_id === ex.id);
+                        const directNoteRecord = (directNotes || []).find((dn: any) => 
+                            String(dn.estudiante_id) === String(est.cedula) && 
+                            Number(dn.examen_id) === Number(ex.id)
+                        );
 
                         let nota = 0;
                         let obtenido = 0;
 
-                        if (directNoteRecord) {
+                        if (directNoteRecord !== undefined && directNoteRecord !== null) {
                             nota = Number(directNoteRecord.nota);
                             obtenido = Number(((nota / 100) * ex.porcentaje).toFixed(2));
                         } else {
-                            const exInds = indicators.filter(i => i.examen_id === ex.id);
+                            const exInds = indicators.filter(i => Number(i.examen_id) === Number(ex.id));
                             const studentEvals = evaluations.filter(ev =>
-                                ev.estudiante_id === est.cedula &&
+                                String(ev.estudiante_id) === String(est.cedula) &&
                                 exInds.some(i => i.id === ev.indicador_id)
                             );
 
                             let pointsPaid = 0;
-                            studentEvals.forEach(ev => { pointsPaid += ev.puntaje || 0; });
+                            studentEvals.forEach(ev => { pointsPaid += Number(ev.puntaje) || 0; });
 
                             nota = Math.round((pointsPaid / ex.puntos_totales) * 100) || 0;
                             obtenido = Number(((nota / 100) * ex.porcentaje).toFixed(2));
@@ -141,6 +144,9 @@ export const ExamenSummary: React.FC<ExamenSummaryProps> = ({ seccionId, periodo
                                             {examenes.map(ex => {
                                                 const grade = gradesMap[est.cedula]?.[ex.id] || { nota: 0, obtenido: 0 };
                                                 totalPorcentaje += grade.obtenido;
+                                                
+                                                // We can't easily check directNotes here without re-fetching or passing it, 
+                                                // but the logic already uses it. I'll just keep it consistent.
                                                 return (
                                                     <td key={ex.id} style={{ textAlign: 'center', padding: '0.75rem' }}>
                                                         <div style={{ fontWeight: 600 }}>{grade.nota}%</div>

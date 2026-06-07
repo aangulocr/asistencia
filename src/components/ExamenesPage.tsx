@@ -256,6 +256,8 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
             }
 
             showToast('Evaluaciones de examen guardadas', 'success');
+            // Re-fetch to ensure local state and summary modal are perfectly in sync with DB
+            fetchIndicadoresAndEvaluations(selectedExamen);
         } catch (error: any) {
             showToast(`Error: ${error.message}`, 'error');
         } finally { setIsSaving(false); }

@@ -45,22 +45,39 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, 
                 const { data: evalData } = await (supabase as any).from('evaluaciones_tarea').select('*').in('indicador_id', indicators.map((i: any) => i.id));
                 const evaluations = evalData || [];
 
+                // Direct notes
+                const { data: directData } = await (supabase as any).from('notas_directas_tarea').select('*').in('tarea_id', tarIds);
+                const directNotes = directData || [];
+
                 // Calculate grades
                 const newGradesMap: any = {};
                 students.forEach((est: any) => {
                     newGradesMap[est.cedula] = {};
                     tasks.forEach((tar: any) => {
-                        const tarInds = indicators.filter((i: any) => i.tarea_id === tar.id);
-                        const studentEvals = evaluations.filter((ev: any) =>
-                            ev.estudiante_id === est.cedula &&
-                            tarInds.some((i: any) => i.id === ev.indicador_id)
+                        const directNoteRecord = (directNotes || []).find((dn: any) => 
+                            String(dn.estudiante_id) === String(est.cedula) && 
+                            Number(dn.tarea_id) === Number(tar.id)
                         );
 
-                        let pointsPaid = 0;
-                        studentEvals.forEach((ev: any) => { pointsPaid += ev.puntaje || 0; });
+                        let nota = 0;
+                        let obtenido = 0;
 
-                        const nota = Math.round((pointsPaid / tar.puntos_totales) * 100) || 0;
-                        const obtenido = Number(((nota / 100) * tar.porcentaje).toFixed(2));
+                        if (directNoteRecord !== undefined && directNoteRecord !== null) {
+                            nota = Number(directNoteRecord.nota);
+                            obtenido = Number(((nota / 100) * tar.porcentaje).toFixed(2));
+                        } else {
+                            const tarInds = indicators.filter((i: any) => Number(i.tarea_id) === Number(tar.id));
+                            const studentEvals = evaluations.filter((ev: any) =>
+                                String(ev.estudiante_id) === String(est.cedula) &&
+                                tarInds.some((i: any) => i.id === ev.indicador_id)
+                            );
+
+                            let pointsPaid = 0;
+                            studentEvals.forEach((ev: any) => { pointsPaid += Number(ev.puntaje) || 0; });
+
+                            nota = Math.round((pointsPaid / tar.puntos_totales) * 100) || 0;
+                            obtenido = Number(((nota / 100) * tar.porcentaje).toFixed(2));
+                        }
 
                         newGradesMap[est.cedula][tar.id] = { nota, obtenido };
                     });
@@ -119,7 +136,10 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, 
                                             <td style={{ padding: '0.75rem 1rem' }}>{est.apellidos}, {est.nombre}</td>
                                             {tareas.map(t => {
                                                 const grade = gradesMap[est.cedula]?.[t.id] || { nota: 0, obtenido: 0 };
-                                                totalPorcentaje += grade.obtenido;
+                                                // Check for direct grade to show indicator (we'll need to pass directNotes or check it differently)
+                                                // Since we already calculated gradesMap based on directNotes, we can just check if it was direct
+                                                // But to be sure, let's just show the note.
+                                                // Actually, let's fetch directNotes properly in TareaSummary to show the star
                                                 return (
                                                     <td key={t.id} style={{ textAlign: 'center', padding: '0.75rem' }}>
                                                         <div style={{ fontWeight: 600 }}>{grade.nota}%</div>

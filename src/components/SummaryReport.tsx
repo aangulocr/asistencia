@@ -60,6 +60,10 @@ export function SummaryReport({ seccionId, periodo, onClose }: Props) {
                 .eq('periodo', periodo);
             const config = configData as any[] || [];
 
+            // 4. Fetch Direct Notes (If any apply here, though this is attendance)
+            // Note: If the user is referring to the COTIDIANO direct notes, they might want them here too?
+            // But this summary is specifically for attendance-based suggested grades.
+
             const configMap: Record<string, number> = {};
             config.forEach(c => configMap[c.fecha] = c.lecciones_totales);
 
