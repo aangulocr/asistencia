@@ -9,6 +9,8 @@ interface CotidianoSummaryProps {
     trabajos: any[];
     gradesMap: Record<string, Record<number, number>>;
     seccionNombre: string;
+    seccionId: string;
+    notasDirectas?: any[];
 }
 
 export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({ 
