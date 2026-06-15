@@ -134,12 +134,9 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, 
                                     return (
                                         <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '0.75rem 1rem' }}>{est.apellidos}, {est.nombre}</td>
-                                            {tareas.map(t => {
+                                             {tareas.map(t => {
                                                 const grade = gradesMap[est.cedula]?.[t.id] || { nota: 0, obtenido: 0 };
-                                                // Check for direct grade to show indicator (we'll need to pass directNotes or check it differently)
-                                                // Since we already calculated gradesMap based on directNotes, we can just check if it was direct
-                                                // But to be sure, let's just show the note.
-                                                // Actually, let's fetch directNotes properly in TareaSummary to show the star
+                                                totalPorcentaje += grade.obtenido;
                                                 return (
                                                     <td key={t.id} style={{ textAlign: 'center', padding: '0.75rem' }}>
                                                         <div style={{ fontWeight: 600 }}>{grade.nota}%</div>
