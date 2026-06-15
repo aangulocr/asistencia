@@ -200,7 +200,57 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
         }
     };
     
-    async function saveEvaluations() { /* Implementation omitted for brevity, it's correct */ }
+    async function saveEvaluations() {
+        setIsSaving(true);
+        try {
+            const upsertData: any[] = [];
+            const directNotesUpsert: any[] = [];
+            const directNotesDelete: string[] = [];
+
+            estudiantes.forEach(est => {
+                const directGrade = notasDirectas[est.cedula];
+                if (directGrade !== undefined && directGrade !== '') {
+                    directNotesUpsert.push({
+                        trabajo_id: parseInt(selectedTrabajo),
+                        estudiante_id: est.cedula,
+                        nota: Number(directGrade)
+                    });
+                } else {
+                    directNotesDelete.push(est.cedula);
+                    const estEvals = evaluaciones[est.cedula] || {};
+                    indicadores.forEach(ind => {
+                        if (estEvals[ind.id] !== undefined) {
+                            upsertData.push({ estudiante_id: est.cedula, indicador_id: ind.id, puntaje: estEvals[ind.id] });
+                        }
+                    });
+                }
+            });
+
+            if (upsertData.length > 0) {
+                const { error } = await typedSupabase.from('evaluaciones_cotidiano').upsert(upsertData, { onConflict: 'estudiante_id, indicador_id' });
+                if (error) throw error;
+            }
+
+            if (directNotesUpsert.length > 0) {
+                const { error } = await (typedSupabase as any).from('notas_directas_cotidiano').upsert(directNotesUpsert, { onConflict: 'trabajo_id, estudiante_id' });
+                if (error) throw error;
+            }
+
+            if (directNotesDelete.length > 0) {
+                const { error } = await (typedSupabase as any).from('notas_directas_cotidiano')
+                    .delete()
+                    .eq('trabajo_id', parseInt(selectedTrabajo))
+                    .in('estudiante_id', directNotesDelete);
+                if (error) throw error;
+            }
+
+            showToast('Evaluaciones de cotidiano guardadas', 'success');
+            // Re-fetch to ensure local state and summary modal are perfectly in sync with DB
+            fetchIndicadoresAndEvaluations(selectedTrabajo);
+        } catch (error: any) {
+            showToast(`Error: ${error.message}`, 'error');
+        } finally { setIsSaving(false); }
+    }
     const handleNewTrabajo = () => { /* Implementation omitted */ };
     const handleEditRubrica = () => { /* Implementation omitted */ };
     const handleLoadTemplate = (id:string) => { /* Implementation omitted */ };
