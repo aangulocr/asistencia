@@ -28,12 +28,26 @@ function App() {
     const maxDate = today < '2026-11-30' ? today : '2026-11-30';
     const initialDate = today >= '2026-02-02' && today <= '2026-11-30' ? today : '2026-02-02';
     const [selectedDate, setSelectedDate] = useState<string>(initialDate);
-    const [periodo, setPeriodo] = useState<number>(1);
+
+    const getPeriodoForDate = (dateStr: string): number => {
+        if (!dateStr) return 1;
+        const year = dateStr.split('-')[0];
+        const cutOffDate = `${year}-07-11`;
+        return dateStr >= cutOffDate ? 2 : 1;
+    };
+
+    const [periodo, setPeriodo] = useState<number>(getPeriodoForDate(initialDate));
     const [showReport, setShowReport] = useState(false);
     const [showAttendanceSummary, setShowAttendanceSummary] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [session, setSession] = useState<any>(null);
     const [isConfiguringPassword, setIsConfiguringPassword] = useState(false);
+
+    useEffect(() => {
+        if (selectedDate) {
+            setPeriodo(getPeriodoForDate(selectedDate));
+        }
+    }, [selectedDate]);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
