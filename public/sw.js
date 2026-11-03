@@ -1,5 +1,5 @@
 // Service Worker for Asistencia 2026 - PWA
-const CACHE_NAME = 'asistencia-cache-v2';
+const CACHE_NAME = 'asistencia-cache-v3';
 
 // Assets to cache immediately on installation
 const PRECACHE_ASSETS = [

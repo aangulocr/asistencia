@@ -100,6 +100,28 @@ describe('QA Test Plan: Registro de Notas - Asistencia App', () => {
             expect(finalGrade).toBe(70);
             expect(status).toBe('Aprobado');
         });
+
+        it('[TC-BL-11] Validación de Casos Reales del Acta Anual (MEP 2026)', () => {
+            // Caso 1: Estudiante con 60 y 89 -> Promedio 75 -> Aprobado
+            const c1 = calculateAnnualGrade(60, 89);
+            expect(c1.finalGrade).toBe(75);
+            expect(c1.status).toBe('Aprobado');
+
+            // Caso 2: Estudiante con 58 y 81 -> Promedio 70 -> Aprobado
+            const c2 = calculateAnnualGrade(58, 81);
+            expect(c2.finalGrade).toBe(70);
+            expect(c2.status).toBe('Aprobado');
+
+            // Caso 3: Estudiante con 64 y 71 -> Promedio 68 -> Aplazado
+            const c3 = calculateAnnualGrade(64, 71);
+            expect(c3.finalGrade).toBe(68);
+            expect(c3.status).toBe('Aplazado');
+
+            // Caso 4: Estudiante con 75 y 60 -> Promedio 68 -> Aplazado
+            const c4 = calculateAnnualGrade(75, 60);
+            expect(c4.finalGrade).toBe(68);
+            expect(c4.status).toBe('Aplazado');
+        });
         
     });
 
