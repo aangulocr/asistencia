@@ -34,7 +34,6 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
 
     // Manager state
     const [editNombre, setEditNombre] = useState('');
-    const [editPorcentaje, setEditPorcentaje] = useState<number>(2.5);
     const [editPuntosTotales, setEditPuntosTotales] = useState<number>(10);
     const [editIndicadores, setEditIndicadores] = useState<{ titulo: string, d0: string, d1: string, d2: string, d3: string }[]>([]);
 
@@ -268,7 +267,6 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
 
     const handleNewTarea = () => {
         setEditNombre('');
-        setEditPorcentaje(2.5);
         setEditPuntosTotales(10);
         setEditIndicadores([{ titulo: '', d0: '', d1: '', d2: '', d3: '' }, { titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
         setShowManager(true);
@@ -281,7 +279,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
             const { data: tarea, error: tError } = await supabase.from('tareas').insert({
                 nombre: editNombre,
                 seccion_id: selectedSeccion,
-                porcentaje: editPorcentaje,
+                porcentaje: weights.tareas,
                 puntos_totales: editPuntosTotales,
                 periodo: periodo
             }).select().single();
@@ -311,7 +309,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
             <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
                     <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Tareas</h1>
-                    <p style={{ color: 'var(--text-muted)' }}>Calificación de tareas con rúbrica y porcentaje personalizado.</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Calificación de tareas con rúbrica (valor configurado: {weights.tareas}%).</p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <select
@@ -343,7 +341,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                                     className="glass-card"
                                     style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }}
                                 >
-                                    {tareas.map(t => <option key={t.id} value={t.id} style={{ background: '#1e1b4b' }}>{t.nombre} ({t.porcentaje}%)</option>)}
+                                    {tareas.map(t => <option key={t.id} value={t.id} style={{ background: '#1e1b4b' }}>{t.nombre}</option>)}
                                     {tareas.length === 0 && <option value="">No hay tareas creadas</option>}
                                 </select>
                             </div>
@@ -479,14 +477,10 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                         <button onClick={() => setShowManager(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>✕ Cancelar</button>
                     </div>
 
-                    <div className="grid" style={{ gridTemplateColumns: 'repea(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre de la Tarea</label>
                             <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} placeholder="Ej: Tarea 1 - Investigación" />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Valor Porcentual (%)</label>
-                            <input type="number" step="0.5" value={editPorcentaje} onChange={e => setEditPorcentaje(parseFloat(e.target.value))} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Puntos Totales</label>
