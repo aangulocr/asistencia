@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useEvaluationWeights } from '../lib/evalConfig';
 
 interface TareaSummaryProps {
     seccionId: string;
@@ -13,6 +14,7 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, 
     const [estudiantes, setEstudiantes] = useState<any[]>([]);
     const [tareas, setTareas] = useState<any[]>([]);
     const [gradesMap, setGradesMap] = useState<Record<string, Record<number, { nota: number, obtenido: number }>>>({}); // student_id -> tarea_id -> grades
+    const weights = useEvaluationWeights();
 
     useEffect(() => {
         fetchData();
@@ -122,30 +124,35 @@ export const TareaSummary: React.FC<TareaSummaryProps> = ({ seccionId, periodo, 
                                     {tareas.map(t => (
                                         <th key={t.id} style={{ textAlign: 'center', padding: '1rem' }}>
                                             {t.nombre}
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({t.porcentaje}%)</div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(100%)</div>
                                         </th>
                                     ))}
-                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>TOTAL TAREAS (5%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>PROMEDIO TAREAS ({weights.tareas}%)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {estudiantes.map(est => {
-                                    let totalPorcentaje = 0;
+                                    let totalNotas = 0;
+                                    tareas.forEach(t => {
+                                        const grade = gradesMap[est.cedula]?.[t.id] || { nota: 0, obtenido: 0 };
+                                        totalNotas += grade.nota;
+                                    });
+                                    const average = tareas.length > 0 ? totalNotas / tareas.length : 0;
+                                    const finalContribution = ((average / 100) * weights.tareas).toFixed(2);
                                     return (
                                         <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '0.75rem 1rem' }}>{est.apellidos}, {est.nombre}</td>
-                                             {tareas.map(t => {
+                                            {tareas.map(t => {
                                                 const grade = gradesMap[est.cedula]?.[t.id] || { nota: 0, obtenido: 0 };
-                                                totalPorcentaje += grade.obtenido;
                                                 return (
-                                                    <td key={t.id} style={{ textAlign: 'center', padding: '0.75rem' }}>
-                                                        <div style={{ fontWeight: 600 }}>{grade.nota}%</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{grade.obtenido}%</div>
+                                                    <td key={t.id} style={{ textAlign: 'center', padding: '0.75rem', color: grade.nota < 70 ? 'var(--danger)' : 'white', fontWeight: 600 }}>
+                                                        {grade.nota}%
                                                     </td>
                                                 );
                                             })}
                                             <td style={{ textAlign: 'center', padding: '0.75rem', fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>
-                                                {totalPorcentaje.toFixed(2)}%
+                                                <div>{finalContribution}%</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>Prom: {average.toFixed(1)}%</div>
                                             </td>
                                         </tr>
                                     );

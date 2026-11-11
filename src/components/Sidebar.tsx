@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 
 interface SidebarProps {
     className?: string;
-    currentView: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'reports';
-    onViewChange: (view: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'reports') => void;
+    currentView: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'config' | 'reports';
+    onViewChange: (view: 'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'config' | 'reports') => void;
     periodo: number;
     onPeriodoChange: (periodo: number) => void;
 }
@@ -18,11 +18,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, currentView, onView
     ];
 
     const managementItems = [
+        { id: 'config', icon: '⚙️', label: 'Configuración' },
         { id: 'reports', icon: '📊', label: 'Reportes' },
         { id: 'students', icon: '👤', label: 'Estudiantes' },
     ];
 
-    const enabledViews = ['attendance', 'asistencia_nota', 'cotidiano', 'tareas', 'examenes', 'reports', 'students'];
+    const enabledViews = ['attendance', 'asistencia_nota', 'cotidiano', 'tareas', 'examenes', 'config', 'reports', 'students'];
 
     const renderNavItem = (item: any) => {
         const isEnabled = enabledViews.includes(item.id);

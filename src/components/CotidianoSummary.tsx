@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useEvaluationWeights } from '../lib/evalConfig';
 
 // Este componente ahora es "tonto". Solo recibe datos y los muestra.
 interface CotidianoSummaryProps {
@@ -21,6 +22,7 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({
     trabajos,
     gradesMap,
 }) => {
+    const weights = useEvaluationWeights();
 
     const handlePrint = () => {
         window.print();
@@ -63,7 +65,7 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({
                                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(100%)</div>
                                     </th>
                                 ))}
-                                <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>PROMEDIO TC (35%)</th>
+                                <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>PROMEDIO TC ({weights.cotidiano}%)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -74,8 +76,8 @@ export const CotidianoSummary: React.FC<CotidianoSummaryProps> = ({
                                 trabajos.forEach(t => {
                                     totalSum += studentGrades[t.id] || 0;
                                 });
-                                const average = trabajos.length > 0 ? Math.round(totalSum / trabajos.length) : 0;
-                                const finalContribution = ((average / 100) * 35).toFixed(2);
+                                const average = trabajos.length > 0 ? totalSum / trabajos.length : 0;
+                                const finalContribution = ((average / 100) * weights.cotidiano).toFixed(2);
 
                                 return (
                                     <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>

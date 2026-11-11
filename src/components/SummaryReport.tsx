@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useEvaluationWeights, calculateAttendanceGradeFromAbsenteeism } from '../lib/evalConfig';
 
 interface Props {
     seccionId: string;
@@ -17,21 +18,17 @@ interface StudentReport {
 }
 
 export function SummaryReport({ seccionId, periodo, onClose }: Props) {
+    const weights = useEvaluationWeights();
     const [reports, setReports] = useState<StudentReport[]>([]);
     const [loading, setLoading] = useState(true);
     const [lessonDates, setLessonDates] = useState<{fecha: string, lecciones: number}[]>([]);
 
     useEffect(() => {
         generateReport();
-    }, [seccionId, periodo]);
+    }, [seccionId, periodo, weights.asistencia]);
 
     const getNotaAsignada = (porcentaje: number): string => {
-        if (porcentaje < 10) return "5%";
-        if (porcentaje < 20) return "4%";
-        if (porcentaje < 30) return "3%";
-        if (porcentaje < 40) return "2%";
-        if (porcentaje < 50) return "1%";
-        return "0%";
+        return `${calculateAttendanceGradeFromAbsenteeism(porcentaje, weights.asistencia)}%`;
     };
 
     async function generateReport() {

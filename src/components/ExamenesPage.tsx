@@ -4,6 +4,7 @@ import { Database } from '../types/database';
 import { useToast } from './Toast';
 import { ExamenSummary } from './ExamenSummary';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { useEvaluationWeights } from '../lib/evalConfig';
 
 const typedSupabase = supabase as SupabaseClient<Database>;
 
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
+    const weights = useEvaluationWeights();
     const [secciones, setSecciones] = useState<Database['public']['Tables']['secciones']['Row'][]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [examenes, setExamenes] = useState<Examen[]>([]);
@@ -292,9 +294,21 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
         }
     };
 
+    const existingExamsTotal = Number(
+        examenes.reduce((acc, ex) => acc + Number(ex.porcentaje || 0), 0).toFixed(2)
+    );
+    const remainingExamPercent = Math.max(0, Number((weights.examenes - existingExamsTotal).toFixed(2)));
+
     const handleNewExamen = () => {
+        if (remainingExamPercent <= 0) {
+            showToast(
+                `Ya has asignado el ${existingExamsTotal}% de los ${weights.examenes}% configurados para Exámenes en este semestre.`,
+                'error'
+            );
+            return;
+        }
         setEditNombre('');
-        setEditPorcentaje(25);
+        setEditPorcentaje(Math.min(25, remainingExamPercent));
         setEditPuntosTotales(30);
         setEditIndicadores([{ titulo: '', d0: '', d1: '', d2: '', d3: '' }, { titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
         setShowManager(true);
@@ -302,6 +316,17 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
 
     async function createExamen() {
         if (!editNombre) return;
+        if (isNaN(editPorcentaje) || editPorcentaje <= 0) {
+            showToast('El porcentaje del examen debe ser mayor a 0%.', 'error');
+            return;
+        }
+        if (existingExamsTotal + editPorcentaje > weights.examenes + 0.001) {
+            showToast(
+                `La suma de los exámenes (${(existingExamsTotal + editPorcentaje).toFixed(2)}%) no puede superar el ${weights.examenes}% configurado para Exámenes. Disponible: ${remainingExamPercent}%.`,
+                'error'
+            );
+            return;
+        }
         setLoading(true);
         try {
             const { data: examen, error: eError } = await typedSupabase.from('examenes').insert({
@@ -532,10 +557,19 @@ export const ExamenesPage: React.FC<Props> = ({ periodo }) => {
                             <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', fontSize: '1.1rem' }} placeholder="Ej: Primer Examen Trimestral" />
                         </div>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Valor Porcentual (%)</label>
-                            <input type="number" step="0.5" value={editPorcentaje} onChange={e => {
+                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                                Valor Porcentual (%) — Disp: {remainingExamPercent}% / {weights.examenes}%
+                            </label>
+                            <input type="number" step="0.5" min={0} max={remainingExamPercent} value={editPorcentaje} onChange={e => {
                                 let val = parseFloat(e.target.value);
-                                if (val > 100) val = 100;
+                                if (isNaN(val)) {
+                                    setEditPorcentaje(0);
+                                    return;
+                                }
+                                if (val > remainingExamPercent) {
+                                    val = remainingExamPercent;
+                                    showToast(`El porcentaje máximo disponible es ${remainingExamPercent}% (límite configurado: ${weights.examenes}%).`, 'error');
+                                }
                                 if (val < 0) val = 0;
                                 setEditPorcentaje(val);
                             }} className="glass-card" style={{ width: '100%', padding: '1rem', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: 'white', border: '2px solid var(--primary)' }} />

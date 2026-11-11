@@ -16,11 +16,14 @@ import { TrabajoCotidianoPage } from './components/TrabajoCotidianoPage';
 import { TareasPage } from './components/TareasPage';
 import { ExamenesPage } from './components/ExamenesPage';
 import { FinalReportPage } from './components/FinalReportPage';
+import { ConfiguracionPage } from './components/ConfiguracionPage';
+import { useEvaluationWeights } from './lib/evalConfig';
 
 type Seccion = Database['public']['Tables']['secciones']['Row'];
 
 function App() {
-    const [currentView, setCurrentView] = useState<'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'reports'>('attendance');
+    const [currentView, setCurrentView] = useState<'attendance' | 'students' | 'cotidiano' | 'tareas' | 'examenes' | 'asistencia_nota' | 'config' | 'reports'>('attendance');
+    const weights = useEvaluationWeights();
     const [secciones, setSecciones] = useState<Seccion[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string | null>(null);
     const [selectedNivel, setSelectedNivel] = useState<number>(10);
@@ -299,7 +302,7 @@ function App() {
                                                 fontWeight: 'bold'
                                             }}
                                         >
-                                            💯 Nota Asistencia (5%)
+                                            💯 Nota Asistencia ({weights.asistencia}%)
                                         </button>
                                     </section>
                                 </aside>
@@ -348,6 +351,8 @@ function App() {
                                 />
                             )}
                         </div>
+                    ) : currentView === 'config' ? (
+                        <ConfiguracionPage />
                     ) : currentView === 'reports' ? (
                         <FinalReportPage periodo={periodo} />
                     ) : (

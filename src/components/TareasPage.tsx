@@ -4,6 +4,7 @@ import { Database } from '../types/database';
 import { useToast } from './Toast';
 import { TareaSummary } from './TareaSummary';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { useEvaluationWeights } from '../lib/evalConfig';
 
 const typedSupabase = supabase as SupabaseClient<Database>;
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const TareasPage: React.FC<Props> = ({ periodo }) => {
+    const weights = useEvaluationWeights();
     const [secciones, setSecciones] = useState<any[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [tareas, setTareas] = useState<Tarea[]>([]);
@@ -191,12 +193,14 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
         const currentTarea = tareas.find(t => String(t.id) === selectedTarea);
         if (!currentTarea || indicadores.length === 0) return { nota: 0, obtenido: 0 };
 
+        const effectivePercent = tareas.length > 0 ? weights.tareas / tareas.length : currentTarea.porcentaje;
+
         const dn = notasDirectas[estudianteId];
         if (dn !== undefined && dn !== '') {
             const notaNum = Number(dn);
             return {
                 nota: notaNum,
-                obtenido: Number(((notaNum / 100) * currentTarea.porcentaje).toFixed(2))
+                obtenido: Number(((notaNum / 100) * effectivePercent).toFixed(2))
             };
         }
 
@@ -205,7 +209,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
         indicadores.forEach(ind => { points += studentEvals[ind.id] || 0; });
 
         const nota = Math.round((points / currentTarea.puntos_totales) * 100) || 0;
-        const obtenido = Number(((nota / 100) * currentTarea.porcentaje).toFixed(2));
+        const obtenido = Number(((nota / 100) * effectivePercent).toFixed(2));
 
         return { nota, obtenido };
     };
@@ -346,7 +350,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                             {selectedTarea && (
                                 <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
                                     <div style={{ color: 'var(--primary)' }}><strong>Puntos Totales:</strong> {tareas.find(t => String(t.id) === selectedTarea)?.puntos_totales}</div>
-                                    <div style={{ color: 'var(--primary)' }}><strong>Valor:</strong> {tareas.find(t => String(t.id) === selectedTarea)?.porcentaje}%</div>
+                                    <div style={{ color: 'var(--primary)' }}><strong>Rubro Tareas (Config.):</strong> {weights.tareas}% ({tareas.length > 0 ? (weights.tareas / tareas.length).toFixed(2) : 0}% c/u)</div>
                                 </div>
                             )}
                         </div>

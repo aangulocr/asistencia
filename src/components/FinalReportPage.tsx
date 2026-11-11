@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
 import { Database } from '../types/database';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { useEvaluationWeights, calculateAttendanceGradeFromAbsenteeism } from '../lib/evalConfig';
 
 const typedSupabase = supabase as SupabaseClient<Database>;
 
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
+    const weights = useEvaluationWeights();
     const [secciones, setSecciones] = useState<Seccion[]>([]);
     const [selectedSeccion, setSelectedSeccion] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -78,7 +80,7 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
             }
             fetchReportData(selectedSeccion);
         }
-    }, [selectedSeccion, periodo, viewMode]);
+    }, [selectedSeccion, periodo, viewMode, weights]);
 
     async function fetchInitialData() {
         const { data } = await typedSupabase.from('secciones').select('*').order('nombre') as { data: Seccion[] | null };
@@ -134,7 +136,7 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     const currentTCs = (tcData || []).filter(t => t.periodo === p);
                     const currentTCIds = currentTCs.map(t => t.id);
 
-                    // Cotidiano (35%)
+                    // Cotidiano (weights.cotidiano %)
                     let tcAverage = 0;
                     if (currentTCIds.length > 0) {
                         let sumOfPercentages = 0;
@@ -154,26 +156,30 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                         });
                         tcAverage = (sumOfPercentages / currentTCIds.length) || 0;
                     }
-                    const tcObtained = (tcAverage / 100) * 35;
+                    const tcObtained = (tcAverage / 100) * weights.cotidiano;
 
-                    // Tareas (10%)
-                    let tarObtained = 0;
+                    // Tareas (promedio de tareas * weights.tareas)
+                    let tarAverage = 0;
                     const currentTareas = (tarData || []).filter((t: any) => t.periodo === p);
                     if (currentTareas.length > 0) {
+                        let sumOfPercentages = 0;
                         currentTareas.forEach((tar: any) => {
                             const directNote = (directTarData || []).find((dn: any) => dn.estudiante_id === est.cedula && dn.tarea_id === tar.id);
                             if (directNote) {
-                                tarObtained += (Number(directNote.nota) / 100) * tar.porcentaje;
+                                sumOfPercentages += Number(directNote.nota);
                             } else {
                                 const inds = (tarIndData || []).filter((i: any) => i.tarea_id === tar.id).map((i: any) => i.id);
                                 const evals = (tarEvalData || []).filter((ev: any) => ev.estudiante_id === est.cedula && inds.includes(ev.indicador_id));
                                 const points = evals.reduce((acc: number, curr: any) => acc + (curr.puntaje || 0), 0);
-                                tarObtained += (points / tar.puntos_totales) * tar.porcentaje;
+                                const nota = tar.puntos_totales > 0 ? Math.round((points / tar.puntos_totales) * 100) : 0;
+                                sumOfPercentages += nota;
                             }
                         });
+                        tarAverage = (sumOfPercentages / currentTareas.length) || 0;
                     }
+                    const tarObtained = (tarAverage / 100) * weights.tareas;
 
-                    // Examenes (50%)
+                    // Examenes (weights.examenes % máximo validado por prueba)
                     let exObtained = 0;
                     const currentExams = (exData || []).filter((e: any) => e.periodo === p);
                     if (currentExams.length > 0) {
@@ -190,7 +196,7 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                         });
                     }
 
-                    // Asistencia (5%)
+                    // Asistencia (weights.asistencia %)
                     const studentAtt = (attData || []).filter((a: any) => a.estudiante_id === est.cedula && a.periodo === p);
                     const currentConfigs = (configData || []).filter((c: any) => c.periodo === p);
                     const uniqueDatesForPeriod = Array.from(new Set(currentConfigs.map((c: any) => c.fecha)));
@@ -210,13 +216,7 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     });
                     const flooredAbsences = Math.floor(totalWeight);
                     const absenteeismPercentage = totalProgrammedLessonsForPeriod > 0 ? (flooredAbsences / totalProgrammedLessonsForPeriod) * 100 : 0;
-                    let attObtained = 0;
-                    if (absenteeismPercentage < 10) attObtained = 5;
-                    else if (absenteeismPercentage < 20) attObtained = 4;
-                    else if (absenteeismPercentage < 30) attObtained = 3;
-                    else if (absenteeismPercentage < 40) attObtained = 2;
-                    else if (absenteeismPercentage < 50) attObtained = 1;
-                    else attObtained = 0;
+                    const attObtained = calculateAttendanceGradeFromAbsenteeism(absenteeismPercentage, weights.asistencia);
 
                     return { tcObtained, tarObtained, exObtained, attObtained, total: tcObtained + tarObtained + exObtained + attObtained };
                 };
@@ -326,7 +326,15 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
             link.click();
             document.body.removeChild(link);
         } else {
-            const headers = ['CÉDULA', 'NOMBRE COMPLETO', 'COTIDIANO (35%)', 'TAREAS (10%)', 'EXÁMENES (50%)', 'ASISTENCIA (5%)', 'TOTAL (100%)'];
+            const headers = [
+                'CÉDULA',
+                'NOMBRE COMPLETO',
+                `COTIDIANO (${weights.cotidiano}%)`,
+                `TAREAS (${weights.tareas}%)`,
+                `EXÁMENES (${weights.examenes}%)`,
+                `ASISTENCIA (${weights.asistencia}%)`,
+                'TOTAL (100%)'
+            ];
             const csvContent = [
                 headers.join(','),
                 ...filteredData.map(row => [
@@ -667,17 +675,19 @@ export const FinalReportPage: React.FC<Props> = ({ periodo }) => {
                     <div>
                         <div style={{ marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Desglose Académico Semestral - Semestre {periodo}</h2>
-                            <p style={{ color: 'var(--text-muted)' }}>Ponderación reglamentaria: Cotidiano 35% | Tareas 10% | Exámenes 50% | Asistencia 5%</p>
+                            <p style={{ color: 'var(--text-muted)' }}>
+                                Ponderación configurada: Cotidiano {weights.cotidiano}% | Tareas {weights.tareas}% | Exámenes {weights.examenes}% | Asistencia {weights.asistencia}%
+                            </p>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid var(--glass-border)', background: 'rgba(255,255,255,0.02)' }}>
                                     <th style={{ textAlign: 'left', padding: '1rem' }}>CÉDULA</th>
                                     <th style={{ textAlign: 'left', padding: '1rem' }}>NOMBRE COMPLETO</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>COTIDIANO (35%)</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>TAREAS (10%)</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>EXÁMENES (50%)</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>ASISTENCIA (5%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>COTIDIANO ({weights.cotidiano}%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>TAREAS ({weights.tareas}%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>EXÁMENES ({weights.examenes}%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>ASISTENCIA ({weights.asistencia}%)</th>
                                     <th style={{ textAlign: 'center', padding: '1rem', color: '#0056b3', fontWeight: 800 }}>TOTAL (100%)</th>
                                 </tr>
                             </thead>

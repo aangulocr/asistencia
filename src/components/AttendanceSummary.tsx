@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
+import { useEvaluationWeights, calculateAttendanceGradeFromAbsenteeism } from '../lib/evalConfig';
 
 interface AttendanceSummaryProps {
     seccionId: string;
@@ -9,6 +10,7 @@ interface AttendanceSummaryProps {
 }
 
 export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId, periodo, onClose }) => {
+    const weights = useEvaluationWeights();
     const [loading, setLoading] = useState(true);
     const [seccionName, setSeccionName] = useState('');
     const [estudiantes, setEstudiantes] = useState<any[]>([]);
@@ -16,7 +18,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
 
     useEffect(() => {
         fetchData();
-    }, [seccionId, periodo]);
+    }, [seccionId, periodo, weights.asistencia]);
 
     async function fetchData() {
         setLoading(true);
@@ -80,14 +82,8 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
                     ? (flooredAbsences / totalProgrammedLessons) * 100
                     : 0;
 
-                // Escala MEP:
-                let grade = 0;
-                if (absenteeismPercentage < 10) grade = 5;
-                else if (absenteeismPercentage < 20) grade = 4;
-                else if (absenteeismPercentage < 30) grade = 3;
-                else if (absenteeismPercentage < 40) grade = 2;
-                else if (absenteeismPercentage < 50) grade = 1;
-                else grade = 0;
+                // Escala MEP escalada al porcentaje configurado:
+                const grade = calculateAttendanceGradeFromAbsenteeism(absenteeismPercentage, weights.asistencia);
 
                 newStats[est.cedula] = {
                     totalLessons: totalProgrammedLessons,
@@ -111,7 +107,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
             <div className="glass-card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', position: 'relative', background: '#1e1b4b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="no-print">
-                    <h2 style={{ margin: 0 }}>Cálculo de Asistencia (5%) - {seccionName} - Semestre {periodo}</h2>
+                    <h2 style={{ margin: 0 }}>Cálculo de Asistencia ({weights.asistencia}%) - {seccionName} - Semestre {periodo}</h2>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <button onClick={handlePrint} className="btn-primary" style={{ background: 'var(--primary)' }}>🖨️ Imprimir PDF</button>
                         <button onClick={onClose} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>Cerrar</button>
@@ -120,7 +116,7 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
 
                 <div className="only-print" style={{ display: 'none', textAlign: 'center', marginBottom: '2rem' }}>
                     <h1 style={{ color: 'black' }}>Reporte de Evaluación de Asistencia - MEP 2026</h1>
-                    <p style={{ color: 'black' }}>Sección: {seccionName} | Semestre: {periodo} | Valor: 5%</p>
+                    <p style={{ color: 'black' }}>Sección: {seccionName} | Semestre: {periodo} | Valor: {weights.asistencia}%</p>
                 </div>
 
                 {loading ? (
@@ -135,12 +131,12 @@ export const AttendanceSummary: React.FC<AttendanceSummaryProps> = ({ seccionId,
                                     <th style={{ textAlign: 'center', padding: '1rem' }}>Peso Ausentismo (Injust.)</th>
                                     <th style={{ textAlign: 'center', padding: '1rem' }}>Ausencias (Floor)</th>
                                     <th style={{ textAlign: 'center', padding: '1rem' }}>% Ausentismo</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)', fontWeight: 800 }}>NOTA FINAL (5%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)', fontWeight: 800 }}>NOTA FINAL ({weights.asistencia}%)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {estudiantes.map(est => {
-                                    const s = stats[est.cedula] || { totalLessons: 0, totalWeight: 0, grade: 5 };
+                                    const s = stats[est.cedula] || { totalLessons: 0, totalWeight: 0, grade: weights.asistencia };
                                     return (
                                         <tr key={est.cedula} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '0.75rem 1rem' }}>{est.apellidos}, {est.nombre}</td>

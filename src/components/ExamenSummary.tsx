@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { useEvaluationWeights } from '../lib/evalConfig';
 
 const typedSupabase = supabase as SupabaseClient<Database>;
 
@@ -17,6 +18,7 @@ interface ExamenSummaryProps {
 }
 
 export const ExamenSummary: React.FC<ExamenSummaryProps> = ({ seccionId, periodo, onClose }) => {
+    const weights = useEvaluationWeights();
     const [loading, setLoading] = useState(true);
     const [seccionName, setSeccionName] = useState('');
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
@@ -132,7 +134,7 @@ export const ExamenSummary: React.FC<ExamenSummaryProps> = ({ seccionId, periodo
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({e.porcentaje}%)</div>
                                         </th>
                                     ))}
-                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>TOTAL PRUEBAS (50%)</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem', color: 'var(--primary)' }}>TOTAL PRUEBAS ({weights.examenes}%)</th>
                                 </tr>
                             </thead>
                             <tbody>
