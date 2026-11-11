@@ -268,7 +268,10 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
     const handleNewTarea = () => {
         setEditNombre('');
         setEditPuntosTotales(10);
-        setEditIndicadores([{ titulo: '', d0: '', d1: '', d2: '', d3: '' }, { titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+        setEditIndicadores([
+            { titulo: '', d0: 'No hay Evidencia', d1: '', d2: '', d3: '' },
+            { titulo: '', d0: 'No hay Evidencia', d1: '', d2: '', d3: '' }
+        ]);
         setShowManager(true);
     };
 
@@ -477,14 +480,14 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                         <button onClick={() => setShowManager(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>✕ Cancelar</button>
                     </div>
 
-                    <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+                    <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem', alignItems: 'end' }}>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre de la Tarea</label>
-                            <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} placeholder="Ej: Tarea 1 - Investigación" />
+                            <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)} className="glass-card" style={{ width: '100%', height: '50px', boxSizing: 'border-box', padding: '0 1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--glass-border)' }} placeholder="Ej: Tarea 1 - Investigación" />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Puntos Totales</label>
-                            <input type="number" value={editPuntosTotales} onChange={e => setEditPuntosTotales(parseInt(e.target.value))} className="glass-card" style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} />
+                            <input type="number" value={editPuntosTotales} onChange={e => setEditPuntosTotales(parseInt(e.target.value))} className="glass-card" style={{ width: '100%', height: '50px', boxSizing: 'border-box', padding: '0 1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--glass-border)', textAlign: 'center', fontWeight: 700 }} />
                         </div>
                     </div>
 
@@ -492,12 +495,12 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                         {editIndicadores.map((ind, idx) => (
                             <div key={idx} className="glass-card" style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)' }}>
                                 <div style={{ marginBottom: '1rem', fontWeight: 600, color: 'var(--primary)' }}>Indicador I{idx + 1}</div>
-                                <input type="text" placeholder="Título del indicador..." value={ind.titulo} onChange={e => { const n = [...editIndicadores]; n[idx].titulo = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', padding: '0.75rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }} />
-                                <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                                <input type="text" placeholder="Título del indicador..." value={ind.titulo} onChange={e => { const n = [...editIndicadores]; n[idx].titulo = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '46px', boxSizing: 'border-box', padding: '0 0.85rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--glass-border)' }} />
+                                <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'end' }}>
                                     {[0, 1, 2, 3].map(level => (
                                         <div key={level}>
-                                            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Nivel {level}</label>
-                                            <textarea value={(ind as any)[`d${level}`]} onChange={e => { const n = [...editIndicadores]; (n[idx] as any)[`d${level}`] = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '50px', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: 'none', fontSize: '0.8rem' }} />
+                                            <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Nivel {level}</label>
+                                            <textarea value={(ind as any)[`d${level}`]} onChange={e => { const n = [...editIndicadores]; (n[idx] as any)[`d${level}`] = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', boxSizing: 'border-box', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }} />
                                         </div>
                                     ))}
                                 </div>
@@ -506,7 +509,7 @@ export const TareasPage: React.FC<Props> = ({ periodo }) => {
                     </div>
 
                     <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-                        {editIndicadores.length < 5 && <button onClick={() => setEditIndicadores([...editIndicadores, { titulo: '', d0: '', d1: '', d2: '', d3: '' }])} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>➕ Añadir Indicador</button>}
+                        {editIndicadores.length < 5 && <button onClick={() => setEditIndicadores([...editIndicadores, { titulo: '', d0: 'No hay Evidencia', d1: '', d2: '', d3: '' }])} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)' }}>➕ Añadir Indicador</button>}
                         <button onClick={createTarea} disabled={loading} className="btn-primary">{loading ? '⌛ Creando...' : '✅ Crear Tarea y Rúbrica'}</button>
                     </div>
                 </div>

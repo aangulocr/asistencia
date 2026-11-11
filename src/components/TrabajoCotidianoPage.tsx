@@ -253,7 +253,7 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
     }
     const handleNewTrabajo = () => {
         setEditNombre('');
-        setEditIndicadores([{ id: undefined, titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+        setEditIndicadores([{ id: undefined, titulo: '', d0: 'No hay Evidencia', d1: '', d2: '', d3: '' }]);
         setIsEditing(false);
         setShowManager(true);
     };
@@ -270,7 +270,7 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
             setEditIndicadores(indData.map(i => ({
                 id: i.id,
                 titulo: i.titulo,
-                d0: i.desc_0 || '',
+                d0: i.desc_0 || 'No hay Evidencia',
                 d1: i.desc_1 || '',
                 d2: i.desc_2 || '',
                 d3: i.desc_3 || ''
@@ -289,7 +289,7 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
                 setEditIndicadores(indData.map(i => ({
                     id: undefined,
                     titulo: i.titulo,
-                    d0: i.desc_0 || '',
+                    d0: i.desc_0 || 'No hay Evidencia',
                     d1: i.desc_1 || '',
                     d2: i.desc_2 || '',
                     d3: i.desc_3 || ''
@@ -305,7 +305,7 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
 
     const addIndicatorField = () => {
         if (editIndicadores.length < 5) {
-            setEditIndicadores([...editIndicadores, { id: undefined, titulo: '', d0: '', d1: '', d2: '', d3: '' }]);
+            setEditIndicadores([...editIndicadores, { id: undefined, titulo: '', d0: 'No hay Evidencia', d1: '', d2: '', d3: '' }]);
         }
     };
 
@@ -665,22 +665,22 @@ export const TrabajoCotidianoPage: React.FC<{ periodo: number }> = ({ periodo })
                                     className="glass-card"
                                     style={{ width: '100%', padding: '0.75rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' }}
                                 />
-                                <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                                <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', alignItems: 'end' }}>
                                     <div>
-                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>0 - No presenta evidencia</label>
-                                        <textarea value={ind.d0} onChange={e => { const n = [...editIndicadores]; n[idx].d0 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: 'none', fontSize: '0.8rem' }} />
+                                        <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>0 - No hay Evidencia</label>
+                                        <textarea value={ind.d0} onChange={e => { const n = [...editIndicadores]; n[idx].d0 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', boxSizing: 'border-box', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }} />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>1 - Aún no logrado (Reconoce...)</label>
-                                        <textarea value={ind.d1} onChange={e => { const n = [...editIndicadores]; n[idx].d1 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: 'none', fontSize: '0.8rem' }} />
+                                        <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 - Aún no logrado (Reconoce...)</label>
+                                        <textarea value={ind.d1} onChange={e => { const n = [...editIndicadores]; n[idx].d1 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', boxSizing: 'border-box', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }} />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>2 - En proceso (Infiere...)</label>
-                                        <textarea value={ind.d2} onChange={e => { const n = [...editIndicadores]; n[idx].d2 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: 'none', fontSize: '0.8rem' }} />
+                                        <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>2 - En proceso (Infiere...)</label>
+                                        <textarea value={ind.d2} onChange={e => { const n = [...editIndicadores]; n[idx].d2 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', boxSizing: 'border-box', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }} />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>3 - Logrado (Aplica...)</label>
-                                        <textarea value={ind.d3} onChange={e => { const n = [...editIndicadores]; n[idx].d3 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: 'none', fontSize: '0.8rem' }} />
+                                        <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>3 - Logrado (Aplica...)</label>
+                                        <textarea value={ind.d3} onChange={e => { const n = [...editIndicadores]; n[idx].d3 = e.target.value; setEditIndicadores(n); }} className="glass-card" style={{ width: '100%', height: '60px', boxSizing: 'border-box', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.02)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }} />
                                     </div>
                                 </div>
                             </div>
